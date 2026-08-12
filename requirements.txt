@@ -1,3 +1,6 @@
-# Slice 1a needs only the stdlib + pytest for checks.
-# Ollama / Qdrant client deps arrive in later slices.
+# Slice 1a: stdlib chunking + pytest
+# Slice 1b: Ollama HTTP client for embeddings
+# Slice 1c: Qdrant vector store
 pytest>=8.0.0
+httpx>=0.27.0
+qdrant-client>=1.12.0
