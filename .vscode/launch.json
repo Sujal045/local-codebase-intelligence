@@ -126,6 +126,42 @@
       ]
     },
     {
+      "name": "Debug: pytest (rag / llm)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_rag.py",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
+      "name": "Debug: pytest (rag, live Ollama chat)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "LIVE_OLLAMA": "1"
+      },
+      "args": [
+        "tests/test_rag.py::test_live_ollama_chat_smoke",
+        "-v",
+        "-s"
+      ]
+    },
+    {
       "name": "Python: Current File",
       "type": "debugpy",
       "request": "launch",

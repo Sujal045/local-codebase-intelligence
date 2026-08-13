@@ -4,7 +4,8 @@ Qdrant stores:
 - the embedding vector (for nearest-neighbor search)
 - a payload dict with chunk metadata (path, lines, text)
 
-This package does not call Ollama or build prompts (Slices 1b / 1d).
+The RAG ask() helper lives in ``app.retrieval.rag`` (Slice 1d) and is not
+re-exported here, to avoid circular imports with ``app.llm.prompt``.
 """
 
 from __future__ import annotations
@@ -12,8 +13,8 @@ from __future__ import annotations
 from app.retrieval.vector_store import (
     DEFAULT_COLLECTION_NAME,
     DEFAULT_QDRANT_URL,
-    ScoredChunk,
     QdrantVectorStore,
+    ScoredChunk,
 )
 
 __all__ = [
