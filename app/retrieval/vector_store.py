@@ -168,6 +168,9 @@ class QdrantVectorStore:
             results.append(ScoredChunk.from_payload(hit.payload, score=hit.score))
         return results
 
+    def collection_exists(self) -> bool:
+        return bool(self.client.collection_exists(self.collection_name))
+
     def count(self) -> int:
         info = self.client.get_collection(self.collection_name)
         return int(info.points_count)

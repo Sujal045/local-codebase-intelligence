@@ -2,6 +2,7 @@
 # Slice 1b: Ollama HTTP client for embeddings
 # Slice 1c: Qdrant vector store
 # Slice 1d: Ollama chat + RAG prompt / ask()
+# Slice 1e: CLI index / ask
 pytest>=8.0.0
 httpx>=0.27.0
 qdrant-client>=1.12.0

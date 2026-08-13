@@ -162,6 +162,56 @@
       ]
     },
     {
+      "name": "Debug: pytest (cli)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_cli.py",
+        "tests/test_walker.py",
+        "-v"
+      ]
+    },
+    {
+      "name": "Debug: CLI index (mini_repo)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.cli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "index",
+        "tests/fixtures/mini_repo",
+        "--recreate"
+      ]
+    },
+    {
+      "name": "Debug: CLI ask",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.cli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "ask",
+        "How do we detect spam jobs?"
+      ]
+    },
+    {
       "name": "Python: Current File",
       "type": "debugpy",
       "request": "launch",

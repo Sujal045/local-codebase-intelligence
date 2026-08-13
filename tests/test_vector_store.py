@@ -9,31 +9,7 @@ import pytest
 from app.indexing.chunker import Chunk, chunk_file
 from app.indexing.pipeline import index_chunks
 from app.retrieval.vector_store import QdrantVectorStore, ScoredChunk
-
-
-class FakeEmbedder:
-    """Deterministic tiny vectors for unit tests (no Ollama)."""
-
-    model_name = "fake"
-    dimensions = 4
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        out: list[list[float]] = []
-        for text in texts:
-            # Simple hash-like vector: same text → same vector.
-            seed = sum(ord(c) for c in text) % 97
-            out.append(
-                [
-                    float(seed % 7),
-                    float((seed + 1) % 11),
-                    float((seed + 2) % 13),
-                    float((seed + 3) % 17),
-                ]
-            )
-        return out
-
-    def embed_one(self, text: str) -> list[float]:
-        return self.embed([text])[0]
+from tests.fakes import FakeEmbedder
 
 
 @pytest.fixture
