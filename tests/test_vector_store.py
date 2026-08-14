@@ -53,6 +53,32 @@ def test_upsert_and_search_returns_scored_chunks(store: QdrantVectorStore) -> No
     assert results[0].score >= results[1].score
 
 
+def test_upsert_roundtrips_symbol_metadata(store: QdrantVectorStore) -> None:
+    chunk = Chunk(
+        text="def compute_genuineness(job):\n    return score",
+        path="src/scoring.py",
+        start_line=1,
+        end_line=8,
+        language="python",
+        symbol="compute_genuineness",
+        kind="function",
+        name="compute_genuineness",
+        parent=None,
+    )
+    embedder = FakeEmbedder()
+    store.upsert_chunks([chunk], embedder.embed([chunk.text]))
+
+    hits = store.search(embedder.embed_one(chunk.text), limit=1)
+    assert hits[0].symbol == "compute_genuineness"
+    assert hits[0].kind == "function"
+    assert hits[0].language == "python"
+    assert hits[0].name == "compute_genuineness"
+    assert hits[0].label() == "src/scoring.py:1-8 compute_genuineness (function)"
+    restored = hits[0].to_chunk()
+    assert restored.symbol == chunk.symbol
+    assert restored.kind == chunk.kind
+
+
 def test_index_chunks_pipeline(store: QdrantVectorStore) -> None:
     content = "\n".join(
         [

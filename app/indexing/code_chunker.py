@@ -14,8 +14,8 @@ Policy (why not 1 symbol = 1 chunk?):
 * Module-level leftovers (constants, module docstring) → ``module`` chunks
   so we do not drop code the parser does not name.
 
-This module does not embed, talk to Qdrant, or replace the index pipeline.
-Unsupported languages still use ``chunk_file`` until a later slice.
+The index pipeline (Slice 2C) calls this for ``.py`` / ``.pyi`` files.
+Other languages still use naive ``chunk_file`` windows.
 """
 
 from __future__ import annotations

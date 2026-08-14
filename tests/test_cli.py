@@ -98,6 +98,7 @@ def test_cmd_ask_prints_answer_and_sources(capsys) -> None:
     assert "compute_genuineness" in out
     assert "Sources:" in out
     assert "scoring.py" in out
+    assert "(function)" in out
 
 
 def test_cmd_ask_without_collection_fails(capsys) -> None:

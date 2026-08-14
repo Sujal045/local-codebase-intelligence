@@ -86,6 +86,25 @@
       ]
     },
     {
+      "name": "Debug: pytest (pipeline)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_pipeline.py",
+        "tests/test_vector_store.py",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
       "name": "Debug: pytest (embedder)",
       "type": "debugpy",
       "request": "launch",

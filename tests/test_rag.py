@@ -36,6 +36,22 @@ def test_format_context_includes_path_and_lines() -> None:
     assert "score=0.9100" in rendered
 
 
+def test_format_context_includes_symbol_label() -> None:
+    chunk = ScoredChunk(
+        path="src/scoring.py",
+        start_line=1,
+        end_line=8,
+        text="def compute_genuineness(job):\n    return score",
+        score=0.91,
+        language="python",
+        symbol="compute_genuineness",
+        kind="function",
+        name="compute_genuineness",
+    )
+    rendered = format_context([chunk])
+    assert "src/scoring.py:1-8 compute_genuineness (function)" in rendered
+
+
 def test_format_context_empty() -> None:
     assert "no code context" in format_context([])
 

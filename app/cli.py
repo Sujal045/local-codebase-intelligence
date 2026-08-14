@@ -5,8 +5,8 @@ Two commands:
     python -m app.cli index <repo>
     python -m app.cli ask "How is spam detected?"
 
-``index`` walks a repository, chunks files, embeds them, and stores points
-in Qdrant. ``ask`` embeds the question, retrieves top-k chunks, and calls
+``index`` walks a repository, chunks files (Python via Tree-sitter, other
+files via line windows), embeds them, and stores points in Qdrant. ``ask`` embeds the question, retrieves top-k chunks, and calls
 the local chat model.
 """
 
@@ -37,7 +37,7 @@ from app.retrieval.vector_store import QdrantVectorStore
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m app.cli",
-        description="Local Codebase Intelligence Agent — Version 1 CLI",
+        description="Local Codebase Intelligence Agent — Version 2 CLI",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -189,10 +189,7 @@ def _print_ask_result(result: RagAnswer) -> None:
         print("  (none retrieved)")
         return
     for i, chunk in enumerate(result.sources, start=1):
-        print(
-            f"  [{i}] {chunk.path}:{chunk.start_line}-{chunk.end_line} "
-            f"(score={chunk.score:.4f})"
-        )
+        print(f"  [{i}] {chunk.label()} (score={chunk.score:.4f})")
 
 
 def _friendly_service_error(
