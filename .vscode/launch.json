@@ -54,6 +54,73 @@
       ]
     },
     {
+      "name": "Debug: pytest (python parser)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_python_parser.py",
+        "-v"
+      ]
+    },
+    {
+      "name": "Debug: pytest (languages)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_languages.py",
+        "-v"
+      ]
+    },
+    {
+      "name": "Debug: pytest (code chunker)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_code_chunker.py",
+        "-v"
+      ]
+    },
+    {
+      "name": "Debug: pytest (pipeline)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_pipeline.py",
+        "tests/test_vector_store.py",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
       "name": "Debug: pytest (embedder)",
       "type": "debugpy",
       "request": "launch",

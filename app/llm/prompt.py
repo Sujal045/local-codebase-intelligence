@@ -4,9 +4,8 @@ Prompt construction is where retrieval becomes generation:
 
     question + top-k chunks  →  system/user strings  →  LLM
 
-We keep Version 1 simple: include path + line numbers + code, and ask the
-model to cite those paths. Token budgeting and compression come later
-(Version 7).
+Include path, line numbers, and symbol names when retrieval stored them.
+Token budgeting and compression come later (Version 7).
 """
 
 from __future__ import annotations
@@ -16,7 +15,7 @@ from app.retrieval.vector_store import ScoredChunk
 DEFAULT_SYSTEM_PROMPT = """\
 You are a local codebase assistant. Answer using ONLY the provided code \
 context. If the context is insufficient, say what is missing. Cite file \
-paths and line ranges from the context when possible.\
+paths, line ranges, and symbol names from the context when possible.\
 """
 
 
@@ -27,10 +26,7 @@ def format_context(chunks: list[ScoredChunk]) -> str:
 
     blocks: list[str] = []
     for i, chunk in enumerate(chunks, start=1):
-        header = (
-            f"[{i}] {chunk.path}:{chunk.start_line}-{chunk.end_line} "
-            f"(score={chunk.score:.4f})"
-        )
+        header = f"[{i}] {chunk.label()} (score={chunk.score:.4f})"
         blocks.append(f"{header}\n{chunk.text}")
     return "\n\n".join(blocks)
 

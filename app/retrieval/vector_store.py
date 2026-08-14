@@ -37,6 +37,11 @@ class ScoredChunk:
     end_line: int
     text: str
     score: float
+    language: str | None = None
+    symbol: str | None = None
+    kind: str | None = None
+    name: str | None = None
+    parent: str | None = None
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any], score: float) -> ScoredChunk:
@@ -46,6 +51,11 @@ class ScoredChunk:
             end_line=int(payload["end_line"]),
             text=str(payload["text"]),
             score=score,
+            language=_optional_str(payload, "language"),
+            symbol=_optional_str(payload, "symbol"),
+            kind=_optional_str(payload, "kind"),
+            name=_optional_str(payload, "name"),
+            parent=_optional_str(payload, "parent"),
         )
 
     def to_chunk(self) -> Chunk:
@@ -54,7 +64,21 @@ class ScoredChunk:
             path=self.path,
             start_line=self.start_line,
             end_line=self.end_line,
+            language=self.language,
+            symbol=self.symbol,
+            kind=self.kind,
+            name=self.name,
+            parent=self.parent,
         )
+
+    def label(self) -> str:
+        """Human-readable location, with symbol when Qdrant stored one."""
+        location = f"{self.path}:{self.start_line}-{self.end_line}"
+        if not self.symbol:
+            return location
+        if self.kind:
+            return f"{location} {self.symbol} ({self.kind})"
+        return f"{location} {self.symbol}"
 
 
 class QdrantVectorStore:
@@ -133,12 +157,7 @@ class QdrantVectorStore:
                 qmodels.PointStruct(
                     id=_chunk_point_id(chunk),
                     vector=vector,
-                    payload={
-                        "path": chunk.path,
-                        "start_line": chunk.start_line,
-                        "end_line": chunk.end_line,
-                        "text": chunk.text,
-                    },
+                    payload=_chunk_payload(chunk),
                 )
             )
 
@@ -185,6 +204,39 @@ class QdrantVectorStore:
 
     def __exit__(self, *args: object) -> None:
         self.close()
+
+
+def _chunk_payload(chunk: Chunk) -> dict[str, Any]:
+    """Vector is stored separately; payload is everything we want back at query time.
+
+    Optional symbol fields are omitted when None so naive Version 1 chunks
+    and code-aware chunks can share one collection.
+    """
+    payload: dict[str, Any] = {
+        "path": chunk.path,
+        "start_line": chunk.start_line,
+        "end_line": chunk.end_line,
+        "text": chunk.text,
+    }
+    if chunk.language is not None:
+        payload["language"] = chunk.language
+    if chunk.symbol is not None:
+        payload["symbol"] = chunk.symbol
+    if chunk.kind is not None:
+        payload["kind"] = chunk.kind
+    if chunk.name is not None:
+        payload["name"] = chunk.name
+    if chunk.parent is not None:
+        payload["parent"] = chunk.parent
+    return payload
+
+
+def _optional_str(payload: dict[str, Any], key: str) -> str | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    text = str(value)
+    return text or None
 
 
 def _chunk_point_id(chunk: Chunk) -> str:
