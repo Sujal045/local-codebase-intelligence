@@ -10,6 +10,7 @@ from app.indexing.code_chunker import (
     IMPORTS_KIND,
     METHOD_KIND,
     MODULE_KIND,
+    chunk_code_file,
     chunk_python_file,
 )
 from app.indexing.chunker import Chunk
@@ -167,3 +168,35 @@ def test_chunks_are_ordered_by_source_position() -> None:
     chunks = chunk_python_file("a.py", SAMPLE)
     starts = [c.start_line for c in chunks]
     assert starts == sorted(starts)
+
+
+def test_starred_typed_args_get_sane_line_numbers() -> None:
+    source = '''\
+class Store:
+    def __exit__(self, *args: object) -> None:
+        self.close()
+'''
+    chunks = chunk_python_file("store.py", source)
+    found = {c.symbol: c for c in chunks}
+    exit_chunk = found["Store.__exit__"]
+    assert exit_chunk.start_line == 2
+    assert exit_chunk.end_line == 3
+    assert "__exit__" in exit_chunk.text
+
+
+def test_chunk_repo_vector_store_file() -> None:
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "app" / "retrieval" / "vector_store.py"
+    chunks = chunk_code_file(str(path.relative_to(path.parents[1])), path.read_text())
+    assert chunks
+    n_lines = path.read_text().count("\n") + (0 if path.read_text().endswith("\n") else 1)
+    # splitlines() count matches chunker
+    n_lines = len(path.read_text().splitlines())
+    for chunk in chunks:
+        assert 1 <= chunk.start_line <= chunk.end_line <= n_lines, chunk
+    found = {c.symbol: c for c in chunks}
+    assert found["QdrantVectorStore.__exit__"].start_line == 205
+    assert found["QdrantVectorStore.__exit__"].end_line == 206
+    assert found["QdrantVectorStore.search"].kind == METHOD_KIND
+

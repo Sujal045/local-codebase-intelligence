@@ -17,6 +17,7 @@ class SymbolKind(str, Enum):
     CLASS = "class"
     METHOD = "method"
     IMPORTS = "imports"
+    TYPE = "type"
 
 
 @dataclass(frozen=True)
@@ -25,7 +26,7 @@ class CodeSymbol:
 
     Attributes:
         path: Repo-relative path supplied by the caller (not read from disk).
-        language: Source language id (``python`` in Slice 2A).
+        language: Source language id (``python``, ``javascript``, ``go``, …).
         name: Unqualified name (``create_user``, or ``imports``).
         qualified_name: Dotted name including parent classes
             (``UserService.create_user``).

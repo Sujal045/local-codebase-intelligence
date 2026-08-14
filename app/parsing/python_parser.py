@@ -26,6 +26,13 @@ from tree_sitter import Language, Node, Parser
 import tree_sitter_python as tspython
 
 from app.parsing.symbols import CodeSymbol, SymbolKind
+from app.parsing.tree import (
+    field_text,
+    make_callable_symbol,
+    make_imports_symbol,
+    make_named_symbol,
+    parse_utf8,
+)
 
 _LANGUAGE = Language(tspython.language())
 _PARSER = Parser(_LANGUAGE)
@@ -60,13 +67,14 @@ def extract_python_symbols(source: str, *, path: str = "") -> list[CodeSymbol]:
     if source == "":
         return []
 
-    tree = _PARSER.parse(source.encode("utf-8"))
+    tree, source_bytes = parse_utf8(_PARSER, source)
     symbols: list[CodeSymbol] = []
     _walk_body(
         list(tree.root_node.named_children),
         symbols,
         path=path,
         class_stack=[],
+        source_bytes=source_bytes,
     )
     return symbols
 
@@ -77,6 +85,7 @@ def _walk_body(
     *,
     path: str,
     class_stack: list[str],
+    source_bytes: bytes,
 ) -> None:
     """Walk one body (module or class block) and collect symbols."""
     import_group: list[Node] = []
@@ -84,7 +93,14 @@ def _walk_body(
     def flush_imports() -> None:
         nonlocal import_group
         if import_group and not class_stack:
-            symbols.append(_imports_symbol(import_group, path=path))
+            symbols.append(
+                make_imports_symbol(
+                    import_group,
+                    path=path,
+                    language=_LANGUAGE_ID,
+                    source_bytes=source_bytes,
+                )
+            )
         import_group = []
 
     for node in nodes:
@@ -98,37 +114,34 @@ def _walk_body(
         if definition is None:
             continue
 
-        name = _definition_name(definition)
+        name = field_text(definition)
         if name is None:
             continue
 
         if definition.type == "function_definition":
             symbols.append(
-                _function_or_method_symbol(
+                make_callable_symbol(
                     span_node,
                     name=name,
                     path=path,
+                    language=_LANGUAGE_ID,
                     class_stack=class_stack,
+                    source_bytes=source_bytes,
                 )
             )
             # Do not walk the function body: nested defs are skipped.
             continue
 
         if definition.type == "class_definition":
-            qualified = ".".join(class_stack + [name])
-            parent = ".".join(class_stack) if class_stack else None
-            start_line, end_line = _line_span(span_node)
             symbols.append(
-                CodeSymbol(
+                make_named_symbol(
+                    span_node,
+                    name=name,
                     path=path,
                     language=_LANGUAGE_ID,
-                    name=name,
-                    qualified_name=qualified,
                     kind=SymbolKind.CLASS,
-                    start_line=start_line,
-                    end_line=end_line,
-                    text=_node_text(span_node),
-                    parent=parent,
+                    class_stack=class_stack,
+                    source_bytes=source_bytes,
                 )
             )
             body = definition.child_by_field_name("body")
@@ -138,6 +151,7 @@ def _walk_body(
                     symbols,
                     path=path,
                     class_stack=class_stack + [name],
+                    source_bytes=source_bytes,
                 )
 
     flush_imports()
@@ -157,80 +171,3 @@ def _unwrap_definition(node: Node) -> tuple[Node, Node | None]:
     if node.type in _DEFINITION_TYPES:
         return node, node
     return node, None
-
-
-def _function_or_method_symbol(
-    span_node: Node,
-    *,
-    name: str,
-    path: str,
-    class_stack: list[str],
-) -> CodeSymbol:
-    if class_stack:
-        kind = SymbolKind.METHOD
-        qualified = ".".join(class_stack + [name])
-        parent = ".".join(class_stack)
-    else:
-        kind = SymbolKind.FUNCTION
-        qualified = name
-        parent = None
-    start_line, end_line = _line_span(span_node)
-    return CodeSymbol(
-        path=path,
-        language=_LANGUAGE_ID,
-        name=name,
-        qualified_name=qualified,
-        kind=kind,
-        start_line=start_line,
-        end_line=end_line,
-        text=_node_text(span_node),
-        parent=parent,
-    )
-
-
-def _imports_symbol(nodes: list[Node], *, path: str) -> CodeSymbol:
-    start_line, _ = _line_span(nodes[0])
-    _, end_line = _line_span(nodes[-1])
-    text = "\n".join(_node_text(node) for node in nodes)
-    return CodeSymbol(
-        path=path,
-        language=_LANGUAGE_ID,
-        name="imports",
-        qualified_name="imports",
-        kind=SymbolKind.IMPORTS,
-        start_line=start_line,
-        end_line=end_line,
-        text=text,
-        parent=None,
-    )
-
-
-def _definition_name(node: Node) -> str | None:
-    name_node = node.child_by_field_name("name")
-    if name_node is None or name_node.text is None:
-        return None
-    name = name_node.text.decode("utf-8")
-    return name or None
-
-
-def _node_text(node: Node) -> str:
-    raw = node.text
-    if raw is None:
-        return ""
-    return raw.decode("utf-8")
-
-
-def _line_span(node: Node) -> tuple[int, int]:
-    """Convert Tree-sitter 0-based points to 1-based inclusive line numbers.
-
-    ``end_point`` is the position *after* the last character. If that lands
-    at column 0, the node ended at the previous line's newline.
-    """
-    start_line = node.start_point.row + 1
-    end_row = node.end_point.row
-    end_col = node.end_point.column
-    if end_col == 0 and end_row > node.start_point.row:
-        end_line = end_row
-    else:
-        end_line = end_row + 1
-    return start_line, end_line

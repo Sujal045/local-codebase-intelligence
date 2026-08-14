@@ -1,27 +1,27 @@
-"""Code-aware chunking for Python (Slice 2B).
+"""Code-aware chunking (Slices 2B / 2D).
 
-Slice 2A tells us which symbols exist. This module decides which of those
+Parsers tell us which symbols exist. This module decides which of those
 units become retrievable chunks:
 
     CodeSymbol[]  →  Chunk[]  (text + symbol metadata)
 
 Policy (why not 1 symbol = 1 chunk?):
 
-* Functions, methods, and import groups → one chunk each (whole unit).
-* Classes → a *header* chunk only (signature + docstring + attributes
-  before the first child). The full class text would duplicate every method.
-* Nested ``def`` is already omitted by the parser.
-* Module-level leftovers (constants, module docstring) → ``module`` chunks
-  so we do not drop code the parser does not name.
+* Functions, methods, types, and import groups → one chunk each.
+* Classes / structs → a *header* chunk only (signature + docstring +
+  attributes before the first child). Full type text would duplicate methods.
+* Nested functions are already omitted by the parsers.
+* Module-level leftovers → ``module`` chunks.
 
-The index pipeline (Slice 2C) calls this for ``.py`` / ``.pyi`` files.
-Other languages still use naive ``chunk_file`` windows.
+The index pipeline calls ``chunk_code_file`` for suffixes that have a
+Tree-sitter extractor. Other files still use naive ``chunk_file`` windows.
 """
 
 from __future__ import annotations
 
 from app.indexing.chunker import Chunk
 from app.parsing import CodeSymbol, SymbolKind, extract_python_symbols
+from app.parsing.languages import extract_symbols, language_for_path
 
 _KIND_FUNCTION = SymbolKind.FUNCTION.value
 _KIND_CLASS = SymbolKind.CLASS.value
@@ -30,36 +30,67 @@ _KIND_IMPORTS = SymbolKind.IMPORTS.value
 _KIND_MODULE = "module"
 
 
-def chunk_python_file(path: str, content: str) -> list[Chunk]:
-    """Turn Python source into symbol-aware chunks.
+def chunk_code_file(path: str, content: str) -> list[Chunk]:
+    """Turn a parsed language file into symbol-aware chunks.
 
-    Args:
-        path: Identifier stored on every chunk (usually repo-relative).
-        content: Full file text.
-
-    Returns:
-        Chunks in source order. Empty content yields an empty list.
+    ``path`` chooses the extractor (``.py``, ``.js``, ``.go``, …).
     """
+    language = language_for_path(path)
+    if language is None:
+        raise ValueError(f"No Tree-sitter extractor for path {path!r}")
+    return chunks_from_symbols(
+        path,
+        content,
+        extract_symbols(content, path=path),
+        language=language,
+    )
+
+
+def chunk_python_file(path: str, content: str) -> list[Chunk]:
+    """Turn Python source into symbol-aware chunks (Slice 2B helper)."""
+    if not isinstance(content, str):
+        raise TypeError(f"content must be str, got {type(content)!r}")
+    if content == "":
+        return []
+    return chunks_from_symbols(
+        path,
+        content,
+        extract_python_symbols(content, path=path),
+        language="python",
+    )
+
+
+def chunks_from_symbols(
+    path: str,
+    content: str,
+    symbols: list[CodeSymbol],
+    *,
+    language: str,
+) -> list[Chunk]:
     if not isinstance(content, str):
         raise TypeError(f"content must be str, got {type(content)!r}")
     if content == "":
         return []
 
     lines = content.splitlines()
-    symbols = extract_python_symbols(content, path=path)
     chunks: list[Chunk] = []
-
     children_by_parent = _children_by_parent(symbols)
 
     for symbol in symbols:
         if symbol.kind == SymbolKind.CLASS:
-            header = _class_header_chunk(lines, symbol, children_by_parent.get(symbol.qualified_name, []))
+            header = _class_header_chunk(
+                lines,
+                symbol,
+                children_by_parent.get(symbol.qualified_name, []),
+            )
             if header is not None:
                 chunks.append(header)
             continue
         chunks.append(_chunk_from_symbol(symbol))
 
-    chunks.extend(_module_remainder_chunks(path, lines, symbols))
+    chunks.extend(
+        _module_remainder_chunks(path, lines, symbols, language=language)
+    )
     chunks.sort(key=lambda chunk: (chunk.start_line, chunk.end_line, chunk.kind or ""))
     return chunks
 
@@ -78,17 +109,19 @@ def _class_header_chunk(
     class_symbol: CodeSymbol,
     children: list[CodeSymbol],
 ) -> Chunk | None:
-    """Keep the class prefix up to (but not including) the first child.
+    """Keep the class prefix up to (but not including) the first overlapping child.
 
-    Example::
-
-        class UserService:          ← kept
-            \"\"\"A service.\"\"\"  ← kept
-
-            def create_user(...):   ← first child; not part of the header
+    Go methods live *after* the struct, so they do not shrink the header.
+    JS/Python methods sit inside the class, so they do.
     """
-    if children:
-        header_end = min(child.start_line for child in children) - 1
+    overlapping = [
+        child
+        for child in children
+        if child.start_line <= class_symbol.end_line
+        and child.end_line >= class_symbol.start_line
+    ]
+    if overlapping:
+        header_end = min(child.start_line for child in overlapping) - 1
     else:
         header_end = class_symbol.end_line
     header_end = min(header_end, class_symbol.end_line)
@@ -114,14 +147,19 @@ def _module_remainder_chunks(
     path: str,
     lines: list[str],
     symbols: list[CodeSymbol],
+    *,
+    language: str,
 ) -> list[Chunk]:
     """Chunk module-level lines that no symbol owns (e.g. ``x = 1``)."""
+    n_lines = len(lines)
     covered: set[int] = set()
     for symbol in symbols:
-        covered.update(range(symbol.start_line, symbol.end_line + 1))
+        start = max(1, symbol.start_line)
+        end = min(n_lines, symbol.end_line)
+        if start <= end:
+            covered.update(range(start, end + 1))
 
     chunks: list[Chunk] = []
-    n_lines = len(lines)
     start: int | None = None
 
     def flush(end: int) -> None:
@@ -138,7 +176,7 @@ def _module_remainder_chunks(
                 path=path,
                 start_line=trimmed_start,
                 end_line=trimmed_end,
-                language="python",
+                language=language,
                 symbol="<module>",
                 kind=_KIND_MODULE,
                 name="<module>",
@@ -193,7 +231,6 @@ def _chunk_from_symbol(
     )
 
 
-# Re-export kind strings so tests can assert without importing the enum.
 FUNCTION_KIND = _KIND_FUNCTION
 CLASS_KIND = _KIND_CLASS
 METHOD_KIND = _KIND_METHOD

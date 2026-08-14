@@ -29,18 +29,44 @@ def test_python_files_get_symbol_chunks() -> None:
     assert "def add" in chunks[0].text
 
 
-def test_non_python_files_keep_naive_windows() -> None:
+def test_javascript_files_get_symbol_chunks() -> None:
     files = [
         SourceFile(
-            path="README.md",
+            path="web/add.js",
+            content="export function add(a, b) {\n  return a + b;\n}\n",
+        )
+    ]
+    chunks = collect_chunks(files, chunk_size=40, overlap=10)
+
+    assert len(chunks) == 1
+    assert chunks[0].symbol == "add"
+    assert chunks[0].kind == "function"
+    assert chunks[0].language == "javascript"
+
+
+def test_go_files_get_symbol_chunks() -> None:
+    files = [
+        SourceFile(
+            path="cmd/rank.go",
+            content="package p\nfunc Rank(a, b int) int { return a + b }\n",
+        )
+    ]
+    chunks = collect_chunks(files)
+    found = {c.symbol: c for c in chunks}
+    assert found["Rank"].language == "go"
+    assert found["Rank"].kind == "function"
+
+
+def test_unsupported_languages_keep_naive_windows() -> None:
+    files = [
+        SourceFile(
+            path="parser.rs",
             content="\n".join(f"line {i}" for i in range(1, 21)),
         )
     ]
     chunks = collect_chunks(files, chunk_size=10, overlap=0)
-
     assert [(c.start_line, c.end_line) for c in chunks] == [(1, 10), (11, 20)]
     assert all(c.symbol is None for c in chunks)
-    assert all(c.kind is None for c in chunks)
 
 
 def test_mixed_repo_uses_both_chunkers() -> None:

@@ -70,6 +70,22 @@
       ]
     },
     {
+      "name": "Debug: pytest (languages)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_languages.py",
+        "-v"
+      ]
+    },
+    {
       "name": "Debug: pytest (code chunker)",
       "type": "debugpy",
       "request": "launch",

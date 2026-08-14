@@ -5,8 +5,9 @@ Two commands:
     python -m app.cli index <repo>
     python -m app.cli ask "How is spam detected?"
 
-``index`` walks a repository, chunks files (Python via Tree-sitter, other
-files via line windows), embeds them, and stores points in Qdrant. ``ask`` embeds the question, retrieves top-k chunks, and calls
+``index`` walks a repository, chunks files (Python/JS/TS/Go via
+Tree-sitter, other files via line windows), embeds them, and stores
+points in Qdrant. ``ask`` embeds the question, retrieves top-k chunks, and calls
 the local chat model.
 """
 

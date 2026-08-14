@@ -1,7 +1,7 @@
-"""Index a repository: walk → chunk → embed → upsert (Slices 1c / 1e / 2c).
+"""Index a repository: walk → chunk → embed → upsert.
 
-Python files use Tree-sitter chunks (Slice 2B). Everything else still uses
-naive line windows, with ``chunk_size`` / ``overlap``.
+Suffixes with a Tree-sitter extractor (Python, JS/TS, Go) use symbol
+chunks. Everything else still uses naive line windows.
 """
 
 from __future__ import annotations
@@ -11,12 +11,12 @@ from pathlib import Path
 
 from app.embeddings import Embedder
 from app.indexing.chunker import Chunk, chunk_file
-from app.indexing.code_chunker import chunk_python_file
+from app.indexing.code_chunker import chunk_code_file
 from app.indexing.walker import SourceFile, walk_repository
+from app.parsing.languages import language_for_path
 from app.retrieval.vector_store import QdrantVectorStore
 
 DEFAULT_EMBED_BATCH_SIZE = 16
-PYTHON_SUFFIXES = {".py", ".pyi"}
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ def collect_chunks(
 ) -> list[Chunk]:
     """Chunk every source file and flatten into one list.
 
-    ``.py`` / ``.pyi`` go through ``chunk_python_file`` (symbol metadata).
+    Parsed suffixes go through ``chunk_code_file`` (symbol metadata).
     Other suffixes keep Version 1 line windows so we still index Markdown,
     JSON, and languages we cannot parse yet.
     """
@@ -60,9 +60,8 @@ def chunk_source_file(
     overlap: int = 10,
 ) -> list[Chunk]:
     """Choose a chunker from the file suffix."""
-    suffix = Path(source.path).suffix.lower()
-    if suffix in PYTHON_SUFFIXES:
-        return chunk_python_file(source.path, source.content)
+    if language_for_path(source.path) is not None:
+        return chunk_code_file(source.path, source.content)
     return chunk_file(
         source.path,
         source.content,
