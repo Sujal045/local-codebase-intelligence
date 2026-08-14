@@ -1,9 +1,7 @@
 """Structured code symbols extracted from a syntax tree.
 
-A symbol is *not* a RAG chunk yet. It is the parser's answer to:
-"what named code units exist in this file, and where?"
-
-Slice 2B will turn symbols into chunks. Slice 2A only identifies them.
+A symbol is the parser's answer to: "what named code units exist in this
+file, and where?" Slice 2B turns selected symbols into retrievable Chunks.
 """
 
 from __future__ import annotations

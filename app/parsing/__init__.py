@@ -1,7 +1,7 @@
-"""Code parsing for Version 2 (Slice 2A).
+"""Code parsing for Version 2.
 
-Slice 2A extracts Python symbols with Tree-sitter. It does not replace
-the Version 1 line-window chunker yet — that happens in a later slice.
+Slice 2A extracts Python symbols with Tree-sitter.
+Slice 2B turns those symbols into chunks (``app.indexing.code_chunker``).
 """
 
 from app.parsing.python_parser import extract_python_symbols

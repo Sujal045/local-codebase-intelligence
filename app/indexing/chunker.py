@@ -19,12 +19,23 @@ class Chunk:
         path: File path as provided by the caller (usually repo-relative).
         start_line: First line number in the original file (1-based, inclusive).
         end_line: Last line number in the original file (1-based, inclusive).
+        language: Source language (``python`` for code-aware chunks).
+        symbol: Qualified name (``UserService.create_user``), if known.
+        kind: ``function`` / ``class`` / ``method`` / ``imports`` / ``module``.
+            Naive Version 1 windows leave this None.
+        name: Unqualified name (``create_user``), if known.
+        parent: Qualified parent class, if this chunk is a method or nested class.
     """
 
     text: str
     path: str
     start_line: int
     end_line: int
+    language: str | None = None
+    symbol: str | None = None
+    kind: str | None = None
+    name: str | None = None
+    parent: str | None = None
 
 
 def chunk_file(
