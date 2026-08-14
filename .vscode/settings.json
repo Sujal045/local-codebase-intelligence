@@ -1,0 +1,14 @@
+{
+  "python.analysis.extraPaths": ["${workspaceFolder}"],
+  "python.testing.cwd": "${workspaceFolder}",
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": [
+    "tests",
+    "-m",
+    "not integration"
+  ],
+  "terminal.integrated.env.linux": {
+    "PYTHONPATH": "${workspaceFolder}"
+  }
+}

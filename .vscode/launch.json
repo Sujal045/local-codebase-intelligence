@@ -1,0 +1,227 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: pytest (all unit tests)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
+      "name": "Debug: pytest (current file)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "${relativeFile}",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
+      "name": "Debug: pytest (chunker)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_chunker.py",
+        "-v"
+      ]
+    },
+    {
+      "name": "Debug: pytest (embedder)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_embedder.py",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
+      "name": "Debug: pytest (embedder, live Ollama)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "LIVE_OLLAMA": "1"
+      },
+      "args": [
+        "tests/test_embedder.py::test_live_ollama_nomic_embed_text",
+        "-v",
+        "-s"
+      ]
+    },
+    {
+      "name": "Debug: pytest (vector store)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_vector_store.py",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
+      "name": "Debug: pytest (vector store, live Qdrant)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "LIVE_QDRANT": "1"
+      },
+      "args": [
+        "tests/test_vector_store.py::test_live_qdrant_docker",
+        "-v",
+        "-s"
+      ]
+    },
+    {
+      "name": "Debug: pytest (rag / llm)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_rag.py",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
+      "name": "Debug: pytest (rag, live Ollama chat)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "LIVE_OLLAMA": "1"
+      },
+      "args": [
+        "tests/test_rag.py::test_live_ollama_chat_smoke",
+        "-v",
+        "-s"
+      ]
+    },
+    {
+      "name": "Debug: pytest (cli)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_cli.py",
+        "tests/test_walker.py",
+        "-v"
+      ]
+    },
+    {
+      "name": "Debug: CLI index (mini_repo)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.cli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "index",
+        "tests/fixtures/mini_repo",
+        "--recreate"
+      ]
+    },
+    {
+      "name": "Debug: CLI ask",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.cli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "ask",
+        "How do we detect spam jobs?"
+      ]
+    },
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    }
+  ]
+}
