@@ -23,6 +23,7 @@ def test_parser_index_and_ask_defaults() -> None:
     assert ask_args.command == "ask"
     assert ask_args.question == "Where is spam detected?"
     assert ask_args.limit == 5
+    assert ask_args.candidate_limit == 20
 
 
 def test_cmd_index_writes_to_store(capsys) -> None:
@@ -81,6 +82,7 @@ def test_cmd_ask_prints_answer_and_sources(capsys) -> None:
     args_ask = Namespace(
         question="How do we detect spam jobs?",
         limit=3,
+        candidate_limit=20,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )
@@ -96,9 +98,10 @@ def test_cmd_ask_prints_answer_and_sources(capsys) -> None:
     out = capsys.readouterr().out
     assert "Answer:" in out
     assert "compute_genuineness" in out
-    assert "Sources:" in out
+    assert "Sources (hybrid RRF):" in out
     assert "scoring.py" in out
     assert "(function)" in out
+    assert "rrf=" in out
 
 
 def test_cmd_ask_without_collection_fails(capsys) -> None:
@@ -106,6 +109,7 @@ def test_cmd_ask_without_collection_fails(capsys) -> None:
     args = Namespace(
         question="anything",
         limit=3,
+        candidate_limit=20,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )

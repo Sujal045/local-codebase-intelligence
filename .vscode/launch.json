@@ -121,6 +121,58 @@
       ]
     },
     {
+      "name": "Debug: pytest (bm25)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_bm25.py",
+        "-v"
+      ]
+    },
+    {
+      "name": "Debug: pytest (hybrid)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_hybrid.py",
+        "-v"
+      ]
+    },
+    {
+      "name": "Debug: pytest (hybrid ask)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_rag.py",
+        "tests/test_cli.py",
+        "tests/test_vector_store.py",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
       "name": "Debug: pytest (embedder)",
       "type": "debugpy",
       "request": "launch",

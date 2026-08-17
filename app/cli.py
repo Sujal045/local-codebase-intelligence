@@ -1,4 +1,4 @@
-"""Command-line entry point for Version 1 Code RAG (Slice 1e).
+"""Command-line entry point for hybrid Code RAG (Slice 3C).
 
 Two commands:
 
@@ -7,8 +7,10 @@ Two commands:
 
 ``index`` walks a repository, chunks files (Python/JS/TS/Go via
 Tree-sitter, other files via line windows), embeds them, and stores
-points in Qdrant. ``ask`` embeds the question, retrieves top-k chunks, and calls
-the local chat model.
+points in Qdrant. The payload is also the BM25 corpus.
+
+``ask`` rebuilds BM25 from that payload, fuses vector + lexical hits
+with Reciprocal Rank Fusion, and calls the local chat model.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import sys
 from collections.abc import Sequence
 
 from app.config import (
+    DEFAULT_CANDIDATE_LIMIT,
     DEFAULT_CHAT_MODEL,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_COLLECTION_NAME,
@@ -38,7 +41,7 @@ from app.retrieval.vector_store import QdrantVectorStore
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m app.cli",
-        description="Local Codebase Intelligence Agent — Version 2 CLI",
+        description="Local Codebase Intelligence Agent — hybrid retrieval CLI",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -54,11 +57,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Drop and recreate the Qdrant collection before indexing (default: true)",
     )
 
-    ask_p = sub.add_parser("ask", help="Retrieve relevant chunks and generate an answer")
+    ask_p = sub.add_parser("ask", help="Hybrid retrieve relevant chunks and generate an answer")
     ask_p.add_argument("question", help="Natural-language question about the indexed repo")
     _add_shared_args(ask_p)
     ask_p.add_argument("--chat-model", default=DEFAULT_CHAT_MODEL)
-    ask_p.add_argument("--limit", type=int, default=DEFAULT_TOP_K, help="Top-k chunks")
+    ask_p.add_argument(
+        "--limit",
+        type=int,
+        default=DEFAULT_TOP_K,
+        help="Fused top-k chunks sent to the LLM",
+    )
+    ask_p.add_argument(
+        "--candidates",
+        type=int,
+        default=DEFAULT_CANDIDATE_LIMIT,
+        dest="candidate_limit",
+        help="Per-retriever pool size before Reciprocal Rank Fusion (default: 20)",
+    )
 
     return parser
 
@@ -126,6 +141,7 @@ def cmd_ask(
             store=store,
             llm=llm,
             limit=args.limit,
+            candidate_limit=args.candidate_limit,
         )
     except Exception as exc:
         print(
@@ -185,12 +201,12 @@ def _print_ask_result(result: RagAnswer) -> None:
     print("Answer:")
     print(result.answer.strip())
     print()
-    print("Sources:")
+    print("Sources (hybrid RRF):")
     if not result.sources:
         print("  (none retrieved)")
         return
     for i, chunk in enumerate(result.sources, start=1):
-        print(f"  [{i}] {chunk.label()} (score={chunk.score:.4f})")
+        print(f"  [{i}] {chunk.label()} (rrf={chunk.score:.4f})")
 
 
 def _friendly_service_error(

@@ -1,4 +1,4 @@
-"""Shared defaults for Version 1 CLI and services."""
+"""Shared defaults for CLI and services."""
 
 from __future__ import annotations
 
@@ -12,9 +12,12 @@ NOMIC_EMBED_DIMENSIONS = 768
 DEFAULT_CHUNK_SIZE = 40
 DEFAULT_OVERLAP = 10
 DEFAULT_TOP_K = 5
+# Hits requested from *each* retriever before Reciprocal Rank Fusion.
+DEFAULT_CANDIDATE_LIMIT = 20
 DEFAULT_VECTOR_SIZE = NOMIC_EMBED_DIMENSIONS
 
 __all__ = [
+    "DEFAULT_CANDIDATE_LIMIT",
     "DEFAULT_CHAT_MODEL",
     "DEFAULT_CHUNK_SIZE",
     "DEFAULT_COLLECTION_NAME",

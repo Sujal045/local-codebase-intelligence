@@ -196,7 +196,15 @@ def test_chunk_repo_vector_store_file() -> None:
     for chunk in chunks:
         assert 1 <= chunk.start_line <= chunk.end_line <= n_lines, chunk
     found = {c.symbol: c for c in chunks}
-    assert found["QdrantVectorStore.__exit__"].start_line == 205
-    assert found["QdrantVectorStore.__exit__"].end_line == 206
+    source_lines = path.read_text().splitlines()
+    exit_def = next(
+        i + 1
+        for i, line in enumerate(source_lines)
+        if line.strip().startswith("def __exit__(")
+    )
+    exit_chunk = found["QdrantVectorStore.__exit__"]
+    assert exit_chunk.start_line == exit_def
+    assert exit_chunk.end_line == exit_def + 1
     assert found["QdrantVectorStore.search"].kind == METHOD_KIND
+    assert found["QdrantVectorStore.list_chunks"].kind == METHOD_KIND
 

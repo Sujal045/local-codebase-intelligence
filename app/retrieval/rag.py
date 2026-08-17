@@ -1,10 +1,10 @@
-"""End-to-end ask path for Version 1 RAG (Slice 1d).
+"""End-to-end ask path for hybrid Code RAG (Slice 3C).
 
 Flow:
 
     question
-      → embed
-      → vector search (top-k)
+      → rebuild BM25 from Qdrant payloads
+      → hybrid_search (vector top-N + BM25 top-N → RRF top-k)
       → build prompt
       → LLM complete
       → RagAnswer(answer, sources)
@@ -14,9 +14,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.config import DEFAULT_CANDIDATE_LIMIT
 from app.embeddings import Embedder
 from app.llm import ChatLLM
 from app.llm.prompt import build_rag_messages
+from app.retrieval.bm25 import Bm25Index
+from app.retrieval.hybrid import hybrid_search
 from app.retrieval.vector_store import QdrantVectorStore, ScoredChunk
 
 
@@ -36,23 +39,41 @@ def ask(
     store: QdrantVectorStore,
     llm: ChatLLM,
     limit: int = 5,
+    candidate_limit: int = DEFAULT_CANDIDATE_LIMIT,
+    bm25: Bm25Index | None = None,
 ) -> RagAnswer:
-    """Retrieve relevant chunks and generate an answer.
+    """Retrieve with hybrid search and generate an answer.
 
     Args:
         question: Natural-language question about the indexed codebase.
         embedder: Used to embed the question for vector search.
         store: Qdrant store that already contains indexed chunks.
         llm: Chat model that generates the final answer.
-        limit: How many chunks to retrieve (top-k).
+        limit: How many fused chunks to send to the LLM (RRF top-k).
+        candidate_limit: How many hits to request from *each* retriever
+            before fusion. The actual pool is ``max(candidate_limit, limit)``.
+        bm25: Optional prebuilt lexical index. When omitted, rebuilt from
+            ``store.list_chunks()`` so a one-shot CLI ask stays consistent
+            with the last ``index`` run.
     """
     if not question.strip():
         raise ValueError("question must be non-empty")
     if limit < 1:
         raise ValueError(f"limit must be >= 1, got {limit}")
+    if candidate_limit < 1:
+        raise ValueError(f"candidate_limit must be >= 1, got {candidate_limit}")
 
-    query_vector = embedder.embed_one(question.strip())
-    sources = store.search(query_vector, limit=limit)
+    pool = max(candidate_limit, limit)
+    lexical = bm25 if bm25 is not None else Bm25Index.from_store(store)
+    sources = hybrid_search(
+        question.strip(),
+        embedder=embedder,
+        store=store,
+        bm25=lexical,
+        vector_limit=pool,
+        bm25_limit=pool,
+        limit=limit,
+    )
     system, user = build_rag_messages(question, sources)
     answer = llm.complete(system=system, user=user)
     return RagAnswer(question=question.strip(), answer=answer, sources=sources)

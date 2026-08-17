@@ -79,6 +79,37 @@ def test_upsert_roundtrips_symbol_metadata(store: QdrantVectorStore) -> None:
     assert restored.kind == chunk.kind
 
 
+def test_list_chunks_roundtrips_payload_without_vectors(store: QdrantVectorStore) -> None:
+    chunk = Chunk(
+        text="def compute_genuineness(job):\n    return score",
+        path="src/scoring.py",
+        start_line=1,
+        end_line=8,
+        language="python",
+        symbol="compute_genuineness",
+        kind="function",
+        name="compute_genuineness",
+    )
+    embedder = FakeEmbedder()
+    store.upsert_chunks([chunk], embedder.embed([chunk.text]))
+
+    listed = store.list_chunks()
+    assert len(listed) == 1
+    assert listed[0].text == chunk.text
+    assert listed[0].symbol == "compute_genuineness"
+    assert listed[0].kind == "function"
+    assert listed[0].path == "src/scoring.py"
+
+
+def test_list_chunks_empty_collection(store: QdrantVectorStore) -> None:
+    assert store.list_chunks() == []
+
+
+def test_list_chunks_rejects_bad_page_size(store: QdrantVectorStore) -> None:
+    with pytest.raises(ValueError, match="page_size"):
+        store.list_chunks(page_size=0)
+
+
 def test_index_chunks_pipeline(store: QdrantVectorStore) -> None:
     content = "\n".join(
         [

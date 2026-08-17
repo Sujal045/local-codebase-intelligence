@@ -164,6 +164,33 @@ class QdrantVectorStore:
         self.client.upsert(collection_name=self.collection_name, points=points)
         return len(points)
 
+    def list_chunks(self, *, page_size: int = 128) -> list[Chunk]:
+        """Return every stored chunk payload (no vectors).
+
+        Ask-time BM25 rebuilds from this list so lexical search and vector
+        search share one corpus: whatever ``index`` last upserted.
+        """
+        if page_size < 1:
+            raise ValueError(f"page_size must be >= 1, got {page_size}")
+
+        chunks: list[Chunk] = []
+        offset: Any = None
+        while True:
+            points, offset = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=page_size,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+            for point in points:
+                if point.payload is None:
+                    continue
+                chunks.append(ScoredChunk.from_payload(point.payload, score=0.0).to_chunk())
+            if offset is None:
+                break
+        return chunks
+
     def search(self, query_vector: list[float], *, limit: int = 5) -> list[ScoredChunk]:
         """Return the nearest chunks to ``query_vector`` (higher score = closer)."""
         if limit < 1:
