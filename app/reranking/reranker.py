@@ -12,8 +12,8 @@ the whole index.
 
     hybrid retrieval  →  candidate pool  →  this module  →  top-k for the LLM
 
-This module does not change ``hybrid_search`` or ``ask()``. Slice 4B will
-take a broad fused pool and rerank it; Slice 4C will wire that into the CLI.
+Slice 4B (``search_and_rerank``) fetches a broad fused pool and calls
+this module. ``ask()`` still uses RRF order until Slice 4C.
 
 The neural net itself lives in ``sentence-transformers``. We own the
 contract: pair construction, score attachment, sort, and truncation.

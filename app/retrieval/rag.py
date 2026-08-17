@@ -8,6 +8,8 @@ Flow:
       → build prompt
       → LLM complete
       → RagAnswer(answer, sources)
+
+Slice 4B added ``search_and_rerank``; this function still skips it.
 """
 
 from __future__ import annotations

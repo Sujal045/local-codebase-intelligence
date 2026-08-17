@@ -11,6 +11,7 @@
 # Slice 3b: Reciprocal Rank Fusion of vector + BM25
 # Slice 3c: wire hybrid retrieval into index payload + ask()
 # Slice 4a: local cross-encoder reranker (sentence-transformers + torch)
+# Slice 4b: hybrid candidate pool → rerank (no new deps)
 pytest>=8.0.0
 httpx>=0.27.0
 qdrant-client>=1.12.0
