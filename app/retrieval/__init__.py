@@ -6,6 +6,8 @@ Qdrant stores:
 
 The RAG ask() helper lives in ``app.retrieval.rag`` (Slice 1d) and is not
 re-exported here, to avoid circular imports with ``app.llm.prompt``.
+
+Lexical BM25 search lives in ``app.retrieval.bm25`` (Slice 3A).
 """
 
 from __future__ import annotations

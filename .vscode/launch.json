@@ -121,6 +121,22 @@
       ]
     },
     {
+      "name": "Debug: pytest (bm25)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_bm25.py",
+        "-v"
+      ]
+    },
+    {
       "name": "Debug: pytest (embedder)",
       "type": "debugpy",
       "request": "launch",
