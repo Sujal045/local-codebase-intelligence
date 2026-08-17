@@ -137,6 +137,22 @@
       ]
     },
     {
+      "name": "Debug: pytest (hybrid)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_hybrid.py",
+        "-v"
+      ]
+    },
+    {
       "name": "Debug: pytest (embedder)",
       "type": "debugpy",
       "request": "launch",

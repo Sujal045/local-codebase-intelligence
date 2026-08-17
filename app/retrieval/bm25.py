@@ -13,8 +13,9 @@ ones (``def``, ``return``).
     |D|  — document length (token count); BM25 down-weights very long chunks
     avgdl — average |D| in the corpus
 
-This module does not talk to Qdrant or the LLM. Slice 3B will fuse BM25
-hits with vector hits. Slice 3C will plug hybrid search into ``ask()``.
+This module does not talk to Qdrant or the LLM. Slice 3B fuses BM25 hits
+with vector hits (``app.retrieval.hybrid``). Slice 3C will plug hybrid
+search into ``ask()``.
 """
 
 from __future__ import annotations
