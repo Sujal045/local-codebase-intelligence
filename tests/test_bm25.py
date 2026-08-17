@@ -154,3 +154,29 @@ def test_rare_identifier_outranks_common_keywords() -> None:
     index = Bm25Index(common + [rare])
     hits = index.search("compute_genuineness return", limit=3)
     assert hits[0].symbol == "compute_genuineness"
+
+
+def test_from_store_indexes_qdrant_payloads() -> None:
+    from app.indexing.pipeline import index_chunks
+    from app.retrieval.vector_store import QdrantVectorStore
+    from tests.fakes import FakeEmbedder
+
+    chunk = _chunk(
+        "def compute_genuineness(job):\n    return 1",
+        path="src/scoring.py",
+        symbol="compute_genuineness",
+        name="compute_genuineness",
+    )
+    embedder = FakeEmbedder()
+    with QdrantVectorStore(
+        collection_name="bm25_from_store",
+        vector_size=embedder.dimensions,
+        url=":memory:",
+    ) as store:
+        store.ensure_collection(recreate=True)
+        index_chunks(store, embedder, [chunk])
+        index = Bm25Index.from_store(store)
+
+    assert len(index) == 1
+    hits = index.search("compute_genuineness", limit=1)
+    assert hits[0].symbol == "compute_genuineness"

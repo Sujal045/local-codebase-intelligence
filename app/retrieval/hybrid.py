@@ -15,19 +15,19 @@ A chunk that appears high on *both* lists ranks above a chunk that is #1
 on only one list. Identifier queries (BM25) and conceptual queries
 (vectors) can both contribute.
 
-This module does not change ``ask()``. Slice 3C will wire hybrid retrieval
-into indexing + the CLI.
+``ask()`` (Slice 3C) calls ``hybrid_search`` after rebuilding BM25 from
+the Qdrant payload corpus.
 """
 
 from __future__ import annotations
 
+from app.config import DEFAULT_CANDIDATE_LIMIT
 from app.embeddings import Embedder
 from app.retrieval.bm25 import Bm25Index
 from app.retrieval.vector_store import QdrantVectorStore, ScoredChunk
 
 # Cormack, Clarke, Buettcher (2009). Larger k → flatter rank contributions.
 DEFAULT_RRF_K = 60
-DEFAULT_CANDIDATE_LIMIT = 20
 
 
 def chunk_key(chunk: ScoredChunk) -> tuple[str, int, int]:

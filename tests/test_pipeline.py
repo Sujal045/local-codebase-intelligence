@@ -119,3 +119,22 @@ def test_index_repository_stores_python_symbol_payload() -> None:
     assert scoring_hits
     assert scoring_hits[0].language == "python"
     assert scoring_hits[0].symbol is not None
+
+
+def test_indexed_payload_is_bm25_corpus() -> None:
+    embedder = FakeEmbedder()
+    with QdrantVectorStore(
+        collection_name="pipeline_bm25_corpus",
+        vector_size=embedder.dimensions,
+        url=":memory:",
+    ) as store:
+        result = index_repository(
+            FIXTURE_REPO,
+            store=store,
+            embedder=embedder,
+            recreate=True,
+        )
+        listed = store.list_chunks()
+
+    assert len(listed) == result.upserted
+    assert any(chunk.symbol == "compute_genuineness" for chunk in listed)

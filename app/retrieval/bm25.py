@@ -13,9 +13,9 @@ ones (``def``, ``return``).
     |D|  — document length (token count); BM25 down-weights very long chunks
     avgdl — average |D| in the corpus
 
-This module does not talk to Qdrant or the LLM. Slice 3B fuses BM25 hits
-with vector hits (``app.retrieval.hybrid``). Slice 3C will plug hybrid
-search into ``ask()``.
+This module does not talk to Qdrant or the LLM by itself. Slice 3C rebuilds
+a ``Bm25Index`` from Qdrant payloads (``from_store``) at ask time so the CLI
+does not need a second on-disk index.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import re
 from collections import defaultdict
 
 from app.indexing.chunker import Chunk
-from app.retrieval.vector_store import ScoredChunk
+from app.retrieval.vector_store import QdrantVectorStore, ScoredChunk
 
 # Okapi BM25 defaults (Robertson et al.). k1 saturates TF; b mixes in length.
 DEFAULT_K1 = 1.5
@@ -111,6 +111,17 @@ class Bm25Index:
 
         if chunks:
             self.build(chunks)
+
+    @classmethod
+    def from_store(
+        cls,
+        store: QdrantVectorStore,
+        *,
+        k1: float = DEFAULT_K1,
+        b: float = DEFAULT_B,
+    ) -> Bm25Index:
+        """Build BM25 over every chunk currently stored in Qdrant."""
+        return cls(store.list_chunks(), k1=k1, b=b)
 
     def __len__(self) -> int:
         return self._n

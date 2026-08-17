@@ -2,6 +2,10 @@
 
 Suffixes with a Tree-sitter extractor (Python, JS/TS, Go) use symbol
 chunks. Everything else still uses naive line windows.
+
+Qdrant stores the embedding *and* the payload (path, lines, text, symbol).
+That payload is the BM25 corpus at ask time: there is no second index file.
+``ask`` rebuilds an in-memory ``Bm25Index`` from ``store.list_chunks()``.
 """
 
 from __future__ import annotations

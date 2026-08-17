@@ -7,10 +7,13 @@ import os
 import httpx
 import pytest
 
+from app.indexing.chunker import Chunk
+from app.indexing.pipeline import index_chunks
 from app.llm.ollama_chat import OllamaChatLLM
 from app.llm.prompt import build_rag_messages, format_context
 from app.retrieval.rag import RagAnswer, ask
-from app.retrieval.vector_store import ScoredChunk
+from app.retrieval.vector_store import QdrantVectorStore, ScoredChunk
+from tests.fakes import FakeEmbedder
 
 
 def _chunk(
@@ -138,6 +141,9 @@ class _FakeStore:
         assert len(query_vector) == 4
         return [_chunk()][:limit]
 
+    def list_chunks(self) -> list:
+        return [_chunk().to_chunk()]
+
 
 class _FakeLLM:
     model_name = "fake-chat"
@@ -160,6 +166,59 @@ def test_ask_returns_answer_and_sources() -> None:
     assert "compute_genuineness" in result.answer
     assert result.sources[0].path == "lib/scoring.py"
     assert result.question == "How do we detect spam?"
+
+
+def test_ask_rejects_bad_candidate_limit() -> None:
+    with pytest.raises(ValueError, match="candidate_limit"):
+        ask(
+            "where?",
+            embedder=_FakeEmbedder(),
+            store=_FakeStore(),  # type: ignore[arg-type]
+            llm=_FakeLLM(),
+            candidate_limit=0,
+        )
+
+
+def test_ask_identifier_survives_hybrid_fusion() -> None:
+    """BM25 should still surface an exact symbol after RRF with noisy vectors."""
+    chunks = [
+        Chunk(
+            text="def split_windows(lines):\n    return lines",
+            path="app/indexing/chunker.py",
+            start_line=30,
+            end_line=36,
+            symbol="chunk_file",
+            kind="function",
+            name="chunk_file",
+        ),
+        Chunk(
+            text="def compute_genuineness(job):\n    return {'is_spam': False}",
+            path="src/scoring.py",
+            start_line=1,
+            end_line=8,
+            symbol="compute_genuineness",
+            kind="function",
+            name="compute_genuineness",
+        ),
+    ]
+    embedder = FakeEmbedder()
+    with QdrantVectorStore(
+        collection_name="ask_hybrid",
+        vector_size=embedder.dimensions,
+        url=":memory:",
+    ) as store:
+        store.ensure_collection(recreate=True)
+        index_chunks(store, embedder, chunks)
+        result = ask(
+            "compute_genuineness",
+            embedder=embedder,
+            store=store,
+            llm=_FakeLLM(),
+            limit=2,
+            candidate_limit=2,
+        )
+
+    assert result.sources[0].symbol == "compute_genuineness"
 
 
 def test_ask_rejects_empty_question() -> None:
