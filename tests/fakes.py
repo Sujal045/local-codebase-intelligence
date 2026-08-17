@@ -45,6 +45,35 @@ class RecordingLLM(FakeLLM):
         return "Spam scoring is in compute_genuineness."
 
 
+class FakeReranker:
+    """Deterministic reranker: count query tokens inside chunk.text.
+
+    This is not a cross-encoder. It exists so later slices can test the
+    retrieve → rerank pipeline without loading torch or Hugging Face weights.
+    """
+
+    model_name = "fake-reranker"
+
+    def rerank(
+        self,
+        query: str,
+        candidates: list[ScoredChunk],
+        *,
+        limit: int = 5,
+    ) -> list[ScoredChunk]:
+        from app.reranking import apply_scores
+
+        stripped = query.strip()
+        if not stripped:
+            raise ValueError("query must be non-empty")
+        tokens = [tok.lower() for tok in stripped.split() if tok]
+        scores = [
+            float(sum(chunk.text.lower().count(tok) for tok in tokens))
+            for chunk in candidates
+        ]
+        return apply_scores(candidates, scores, limit=limit)
+
+
 def fake_chunk(
     path: str = "src/scoring.py",
     start: int = 1,
