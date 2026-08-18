@@ -13,7 +13,7 @@ from app.llm.ollama_chat import OllamaChatLLM
 from app.llm.prompt import build_rag_messages, format_context
 from app.retrieval.rag import RagAnswer, ask
 from app.retrieval.vector_store import QdrantVectorStore, ScoredChunk
-from tests.fakes import FakeEmbedder
+from tests.fakes import FakeEmbedder, FakeReranker
 
 
 def _chunk(
@@ -166,6 +166,7 @@ def test_ask_returns_answer_and_sources() -> None:
     assert "compute_genuineness" in result.answer
     assert result.sources[0].path == "lib/scoring.py"
     assert result.question == "How do we detect spam?"
+    assert result.reranked is False
 
 
 def test_ask_rejects_bad_candidate_limit() -> None:
@@ -218,6 +219,49 @@ def test_ask_identifier_survives_hybrid_fusion() -> None:
             candidate_limit=2,
         )
 
+    assert result.sources[0].symbol == "compute_genuineness"
+
+
+def test_ask_reranks_hybrid_pool_when_reranker_is_set() -> None:
+    chunks = [
+        Chunk(
+            text="def split_windows(lines):\n    return lines",
+            path="app/indexing/chunker.py",
+            start_line=30,
+            end_line=36,
+            symbol="chunk_file",
+            kind="function",
+            name="chunk_file",
+        ),
+        Chunk(
+            text="def compute_genuineness(job):\n    flag spam jobs as is_spam",
+            path="src/scoring.py",
+            start_line=1,
+            end_line=8,
+            symbol="compute_genuineness",
+            kind="function",
+            name="compute_genuineness",
+        ),
+    ]
+    embedder = FakeEmbedder()
+    with QdrantVectorStore(
+        collection_name="ask_rerank",
+        vector_size=embedder.dimensions,
+        url=":memory:",
+    ) as store:
+        store.ensure_collection(recreate=True)
+        index_chunks(store, embedder, chunks)
+        result = ask(
+            "detect spam jobs",
+            embedder=embedder,
+            store=store,
+            llm=_FakeLLM(),
+            limit=1,
+            candidate_limit=2,
+            reranker=FakeReranker(),
+        )
+
+    assert result.reranked is True
     assert result.sources[0].symbol == "compute_genuineness"
 
 

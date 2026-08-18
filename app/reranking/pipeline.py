@@ -12,8 +12,7 @@ This function is the two-stage pipeline:
 If the right chunk is RRF #12, a top-5-only search would drop it. A
 20-hit pool still contains it, so the cross-encoder can promote it.
 
-``ask()`` and the CLI are unchanged. Slice 4C will call this instead of
-``hybrid_search(..., limit=5)``.
+``ask()`` (Slice 4C) calls this when a ``reranker`` is injected.
 """
 
 from __future__ import annotations

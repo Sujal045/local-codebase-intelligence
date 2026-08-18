@@ -1,4 +1,4 @@
-"""Local reranking for Code RAG (Slices 4A / 4B).
+"""Local reranking for Code RAG (Slices 4A–4C).
 
 Hybrid retrieval (Version 3) is a *bi-encoder* shortlist: query and chunks
 are encoded separately, then fused. A cross-encoder reranker reads the
@@ -10,7 +10,7 @@ Slice 4A scores a given candidate list. Slice 4B
 ``search_and_rerank`` is imported lazily so ``app.config`` can read
 ``DEFAULT_RERANK_MODEL`` without importing the retrieval pipeline.
 
-``ask()`` still returns Reciprocal Rank Fusion order until Slice 4C.
+``ask()`` (Slice 4C) calls ``search_and_rerank`` when a reranker is injected.
 """
 
 from __future__ import annotations

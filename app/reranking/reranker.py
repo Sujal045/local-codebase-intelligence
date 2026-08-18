@@ -13,7 +13,7 @@ the whole index.
     hybrid retrieval  →  candidate pool  →  this module  →  top-k for the LLM
 
 Slice 4B (``search_and_rerank``) fetches a broad fused pool and calls
-this module. ``ask()`` still uses RRF order until Slice 4C.
+this module. ``ask()`` uses that path when a reranker is injected.
 
 The neural net itself lives in ``sentence-transformers``. We own the
 contract: pair construction, score attachment, sort, and truncation.
