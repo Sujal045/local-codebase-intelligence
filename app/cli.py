@@ -1,4 +1,4 @@
-"""Command-line entry point for hybrid Code RAG (Slice 3C).
+"""Command-line entry point for Code RAG (Slice 4C).
 
 Two commands:
 
@@ -9,8 +9,9 @@ Two commands:
 Tree-sitter, other files via line windows), embeds them, and stores
 points in Qdrant. The payload is also the BM25 corpus.
 
-``ask`` rebuilds BM25 from that payload, fuses vector + lexical hits
-with Reciprocal Rank Fusion, and calls the local chat model.
+``ask`` rebuilds BM25 from that payload, fuses vector + lexical hits,
+reranks the fused pool with a local cross-encoder, and calls the chat
+model. Pass ``--no-rerank`` to send Reciprocal Rank Fusion order instead.
 """
 
 from __future__ import annotations
@@ -28,12 +29,14 @@ from app.config import (
     DEFAULT_OLLAMA_BASE_URL,
     DEFAULT_OVERLAP,
     DEFAULT_QDRANT_URL,
+    DEFAULT_RERANK_MODEL,
     DEFAULT_TOP_K,
     DEFAULT_VECTOR_SIZE,
 )
 from app.embeddings import Embedder, OllamaEmbedder
 from app.indexing.pipeline import IndexResult, index_repository
 from app.llm import ChatLLM, OllamaChatLLM
+from app.reranking.reranker import CrossEncoderReranker, Reranker
 from app.retrieval.rag import RagAnswer, ask as rag_ask
 from app.retrieval.vector_store import QdrantVectorStore
 
@@ -41,7 +44,7 @@ from app.retrieval.vector_store import QdrantVectorStore
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m app.cli",
-        description="Local Codebase Intelligence Agent — hybrid retrieval CLI",
+        description="Local Codebase Intelligence Agent — hybrid retrieval + rerank CLI",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -57,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Drop and recreate the Qdrant collection before indexing (default: true)",
     )
 
-    ask_p = sub.add_parser("ask", help="Hybrid retrieve relevant chunks and generate an answer")
+    ask_p = sub.add_parser("ask", help="Retrieve, rerank, and generate an answer")
     ask_p.add_argument("question", help="Natural-language question about the indexed repo")
     _add_shared_args(ask_p)
     ask_p.add_argument("--chat-model", default=DEFAULT_CHAT_MODEL)
@@ -65,14 +68,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--limit",
         type=int,
         default=DEFAULT_TOP_K,
-        help="Fused top-k chunks sent to the LLM",
+        help="Chunks sent to the LLM after ranking (default: 5)",
     )
     ask_p.add_argument(
         "--candidates",
         type=int,
         default=DEFAULT_CANDIDATE_LIMIT,
         dest="candidate_limit",
-        help="Per-retriever pool size before Reciprocal Rank Fusion (default: 20)",
+        help="Hybrid / RRF pool size before reranking (default: 20)",
+    )
+    ask_p.add_argument(
+        "--rerank",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Rerank the hybrid pool with a cross-encoder (default: true)",
+    )
+    ask_p.add_argument(
+        "--rerank-model",
+        default=DEFAULT_RERANK_MODEL,
+        help=f"Hugging Face cross-encoder id (default: {DEFAULT_RERANK_MODEL})",
     )
 
     return parser
@@ -126,6 +140,7 @@ def cmd_ask(
     embedder: Embedder,
     store: QdrantVectorStore,
     llm: ChatLLM,
+    reranker: Reranker | None = None,
 ) -> int:
     try:
         if not store.collection_exists():
@@ -142,6 +157,7 @@ def cmd_ask(
             llm=llm,
             limit=args.limit,
             candidate_limit=args.candidate_limit,
+            reranker=reranker if args.rerank else None,
         )
     except Exception as exc:
         print(
@@ -174,6 +190,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return cmd_index(args, embedder=embedder, store=store)
 
     if args.command == "ask":
+        reranker: Reranker | None = None
+        if args.rerank:
+            reranker = CrossEncoderReranker(args.rerank_model)
         with (
             OllamaEmbedder(args.embed_model, base_url=args.ollama_url) as embedder,
             OllamaChatLLM(args.chat_model, base_url=args.ollama_url) as llm,
@@ -183,7 +202,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 url=args.qdrant_url,
             ) as store,
         ):
-            return cmd_ask(args, embedder=embedder, store=store, llm=llm)
+            return cmd_ask(
+                args,
+                embedder=embedder,
+                store=store,
+                llm=llm,
+                reranker=reranker,
+            )
 
     parser.error(f"unknown command: {args.command}")
     return 2
@@ -201,12 +226,14 @@ def _print_ask_result(result: RagAnswer) -> None:
     print("Answer:")
     print(result.answer.strip())
     print()
-    print("Sources (hybrid RRF):")
+    kind = "rerank" if result.reranked else "hybrid RRF"
+    score_name = "rerank" if result.reranked else "rrf"
+    print(f"Sources ({kind}):")
     if not result.sources:
         print("  (none retrieved)")
         return
     for i, chunk in enumerate(result.sources, start=1):
-        print(f"  [{i}] {chunk.label()} (rrf={chunk.score:.4f})")
+        print(f"  [{i}] {chunk.label()} ({score_name}={chunk.score:.4f})")
 
 
 def _friendly_service_error(

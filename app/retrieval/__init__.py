@@ -9,7 +9,9 @@ re-exported here, to avoid circular imports with ``app.llm.prompt``.
 
 Lexical BM25 search lives in ``app.retrieval.bm25`` (Slice 3A).
 Hybrid fusion lives in ``app.retrieval.hybrid`` (Slice 3B).
-``ask()`` in ``app.retrieval.rag`` uses hybrid search (Slice 3C).
+``ask()`` in ``app.retrieval.rag`` uses hybrid search (Slice 3C) and
+reranks that pool when a reranker is injected (Slice 4C).
+Retrieve-then-rerank lives in ``app.reranking.pipeline`` (Slice 4B).
 """
 
 from __future__ import annotations

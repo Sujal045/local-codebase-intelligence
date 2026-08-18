@@ -1,4 +1,4 @@
-"""Tests for the Version 1 CLI (Slice 1e)."""
+"""Tests for the CLI (index / ask, Slice 4C)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.cli import build_parser, cmd_ask, cmd_index, main
 from app.retrieval.vector_store import QdrantVectorStore
-from tests.fakes import FakeEmbedder, RecordingLLM
+from tests.fakes import FakeEmbedder, FakeReranker, RecordingLLM
 
 FIXTURE_REPO = Path(__file__).parent / "fixtures" / "mini_repo"
 
@@ -24,6 +24,11 @@ def test_parser_index_and_ask_defaults() -> None:
     assert ask_args.question == "Where is spam detected?"
     assert ask_args.limit == 5
     assert ask_args.candidate_limit == 20
+    assert ask_args.rerank is True
+    assert ask_args.rerank_model == "BAAI/bge-reranker-base"
+
+    skipped = parser.parse_args(["ask", "q", "--no-rerank"])
+    assert skipped.rerank is False
 
 
 def test_cmd_index_writes_to_store(capsys) -> None:
@@ -83,6 +88,7 @@ def test_cmd_ask_prints_answer_and_sources(capsys) -> None:
         question="How do we detect spam jobs?",
         limit=3,
         candidate_limit=20,
+        rerank=True,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )
@@ -92,16 +98,62 @@ def test_cmd_ask_prints_answer_and_sources(capsys) -> None:
         url=":memory:",
     ) as store:
         assert cmd_index(args_index, embedder=embedder, store=store) == 0
-        code = cmd_ask(args_ask, embedder=embedder, store=store, llm=llm)
+        code = cmd_ask(
+            args_ask,
+            embedder=embedder,
+            store=store,
+            llm=llm,
+            reranker=FakeReranker(),
+        )
 
     assert code == 0
     out = capsys.readouterr().out
     assert "Answer:" in out
     assert "compute_genuineness" in out
-    assert "Sources (hybrid RRF):" in out
+    assert "Sources (rerank):" in out
     assert "scoring.py" in out
     assert "(function)" in out
+    assert "rerank=" in out
+    assert "rrf=" not in out
+
+
+def test_cmd_ask_no_rerank_prints_rrf_scores(capsys) -> None:
+    embedder = FakeEmbedder()
+    llm = RecordingLLM()
+    args_index = Namespace(
+        repo=str(FIXTURE_REPO),
+        chunk_size=20,
+        overlap=0,
+        recreate=True,
+        qdrant_url=":memory:",
+    )
+    args_ask = Namespace(
+        question="How do we detect spam jobs?",
+        limit=3,
+        candidate_limit=20,
+        rerank=False,
+        qdrant_url=":memory:",
+        ollama_url="http://127.0.0.1:11434",
+    )
+    with QdrantVectorStore(
+        collection_name="cli_ask_rrf",
+        vector_size=embedder.dimensions,
+        url=":memory:",
+    ) as store:
+        assert cmd_index(args_index, embedder=embedder, store=store) == 0
+        code = cmd_ask(
+            args_ask,
+            embedder=embedder,
+            store=store,
+            llm=llm,
+            reranker=FakeReranker(),
+        )
+
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "Sources (hybrid RRF):" in out
     assert "rrf=" in out
+    assert "rerank=" not in out
 
 
 def test_cmd_ask_without_collection_fails(capsys) -> None:
@@ -110,6 +162,7 @@ def test_cmd_ask_without_collection_fails(capsys) -> None:
         question="anything",
         limit=3,
         candidate_limit=20,
+        rerank=True,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )

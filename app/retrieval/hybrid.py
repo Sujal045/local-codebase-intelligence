@@ -84,7 +84,8 @@ def hybrid_search(
 
     Each retriever is asked for more than ``limit`` hits (default 20) so a
     chunk that is #8 on BM25 and #9 on vectors can still enter the fused
-    top-5. Phase 4 will rerank a similar broad pool with a cross-encoder.
+    top-5. ``search_and_rerank`` (Slice 4B) keeps this fused pool large
+    and hands it to a cross-encoder.
     """
     if not query.strip():
         raise ValueError("query must be non-empty")
