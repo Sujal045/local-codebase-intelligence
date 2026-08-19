@@ -3,16 +3,13 @@
 Flow:
 
     question
-      → rebuild BM25 from Qdrant payloads
-      → hybrid_search (vector top-N + BM25 top-N → RRF pool)
-      → rerank the pool (unless ``reranker`` is omitted)
+      → retrieve_chunks (hybrid pool, optional rerank)
       → build prompt
       → LLM complete
       → RagAnswer(answer, sources)
 
-``ask()`` does not construct models. The CLI (``main``) injects a
-``CrossEncoderReranker`` by default, or skips it with ``--no-rerank``.
-Tests inject ``FakeReranker`` so they never load torch.
+Slice 5A extracted ``retrieve_chunks`` so ``search_code`` can retrieve
+without generating. ``ask()`` is still one-shot RAG, not an agent loop.
 """
 
 from __future__ import annotations
@@ -23,10 +20,9 @@ from app.config import DEFAULT_CANDIDATE_LIMIT
 from app.embeddings import Embedder
 from app.llm import ChatLLM
 from app.llm.prompt import build_rag_messages
-from app.reranking.pipeline import search_and_rerank
 from app.reranking.reranker import Reranker
 from app.retrieval.bm25 import Bm25Index
-from app.retrieval.hybrid import hybrid_search
+from app.retrieval.query import retrieve_chunks
 from app.retrieval.vector_store import QdrantVectorStore, ScoredChunk
 
 
@@ -71,42 +67,21 @@ def ask(
     """
     if not question.strip():
         raise ValueError("question must be non-empty")
-    if limit < 1:
-        raise ValueError(f"limit must be >= 1, got {limit}")
-    if candidate_limit < 1:
-        raise ValueError(f"candidate_limit must be >= 1, got {candidate_limit}")
 
-    stripped = question.strip()
-    lexical = bm25 if bm25 is not None else Bm25Index.from_store(store)
-    if reranker is not None:
-        sources = search_and_rerank(
-            stripped,
-            embedder=embedder,
-            store=store,
-            bm25=lexical,
-            reranker=reranker,
-            candidate_limit=candidate_limit,
-            limit=limit,
-        )
-        reranked = True
-    else:
-        pool = max(candidate_limit, limit)
-        sources = hybrid_search(
-            stripped,
-            embedder=embedder,
-            store=store,
-            bm25=lexical,
-            vector_limit=pool,
-            bm25_limit=pool,
-            limit=limit,
-        )
-        reranked = False
-
-    system, user = build_rag_messages(question, sources)
+    retrieved = retrieve_chunks(
+        question,
+        embedder=embedder,
+        store=store,
+        limit=limit,
+        candidate_limit=candidate_limit,
+        bm25=bm25,
+        reranker=reranker,
+    )
+    system, user = build_rag_messages(question, retrieved.chunks)
     answer = llm.complete(system=system, user=user)
     return RagAnswer(
-        question=stripped,
+        question=question.strip(),
         answer=answer,
-        sources=sources,
-        reranked=reranked,
+        sources=retrieved.chunks,
+        reranked=retrieved.reranked,
     )
