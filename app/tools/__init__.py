@@ -6,8 +6,9 @@ Slice 5C: ``get_symbol`` / ``find_references`` — definition lookup and
 lexical mention scan (not a call graph).
 Slice 5D: ``search_documentation`` — BM25 over README / docs paths only.
 
-The LLM does not call these yet. Version 6 will send ``spec()`` to Ollama
-and run ``tool.run(**arguments)`` when the model requests a tool.
+``run_agent`` (Slice 6A) can call these. ``OllamaChatLLM.respond``
+(Slice 6B) sends each tool's ``spec()`` to Ollama. The CLI
+``python -m app.cli agent`` (Slice 6C) wires the full tool set.
 """
 
 from __future__ import annotations

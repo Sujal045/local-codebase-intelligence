@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from app.agent.types import AgentTurn
 from app.retrieval.vector_store import ScoredChunk
 
 
@@ -72,6 +75,25 @@ class FakeReranker:
             for chunk in candidates
         ]
         return apply_scores(candidates, scores, limit=limit)
+
+
+class ScriptedToolLLM:
+    """Plays back ``AgentTurn`` values for CLI / agent tests (no Ollama)."""
+
+    def __init__(self, turns: list[AgentTurn]) -> None:
+        self._turns = list(turns)
+        self.calls: list[list[dict[str, Any]]] = []
+
+    def respond(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]],
+    ) -> AgentTurn:
+        self.calls.append(list(messages))
+        if not self._turns:
+            return AgentTurn(content="(script exhausted)")
+        return self._turns.pop(0)
 
 
 def fake_chunk(
