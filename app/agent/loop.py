@@ -25,8 +25,8 @@ One-shot RAG (``ask()``) always retrieves, then generates. An agent
 guard against infinite tool loops.
 
 Tests can inject a scripted ``ToolCallingLLM``. Production uses
-``OllamaChatLLM.respond`` (Slice 6B). The CLI still uses one-shot
-``ask()`` until Slice 6C.
+``OllamaChatLLM.respond`` (Slice 6B). The CLI ``agent`` command (Slice 6C)
+builds tools and calls this loop; ``ask`` remains one-shot RAG.
 """
 
 from __future__ import annotations

@@ -47,12 +47,16 @@ class SearchCodeTool:
         bm25: Bm25Index | None = None,
         reranker: Reranker | None = None,
         candidate_limit: int = DEFAULT_CANDIDATE_LIMIT,
+        default_limit: int = DEFAULT_TOP_K,
     ) -> None:
+        if default_limit < 1:
+            raise ValueError(f"default_limit must be >= 1, got {default_limit}")
         self._embedder = embedder
         self._store = store
         self._bm25 = bm25
         self._reranker = reranker
         self._candidate_limit = candidate_limit
+        self._default_limit = default_limit
 
     def spec(self) -> dict[str, Any]:
         return {
@@ -78,7 +82,8 @@ class SearchCodeTool:
                         "limit": {
                             "type": "integer",
                             "description": (
-                                f"Maximum chunks to return (default {DEFAULT_TOP_K})."
+                                f"Maximum chunks to return "
+                                f"(default {self._default_limit})."
                             ),
                             "minimum": 1,
                         },
@@ -104,7 +109,7 @@ class SearchCodeTool:
                 content="error: query must be a non-empty string",
             )
 
-        limit = arguments.get("limit", DEFAULT_TOP_K)
+        limit = arguments.get("limit", self._default_limit)
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
             return ToolResult(
                 name=self.name,

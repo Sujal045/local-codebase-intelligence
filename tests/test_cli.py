@@ -1,4 +1,4 @@
-"""Tests for the CLI (index / ask, Slice 4C)."""
+"""Tests for the CLI (index / ask, Slice 4C; agent in test_cli_agent)."""
 
 from __future__ import annotations
 

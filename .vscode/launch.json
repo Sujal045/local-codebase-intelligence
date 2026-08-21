@@ -516,6 +516,40 @@
       ]
     },
     {
+      "name": "Debug: pytest (cli agent)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_cli_agent.py",
+        "-v"
+      ]
+    },
+    {
+      "name": "Debug: CLI agent (mini_repo)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.cli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "agent",
+        "How do we detect spam jobs?",
+        "--repo",
+        "tests/fixtures/mini_repo"
+      ]
+    },
+    {
       "name": "Python: Current File",
       "type": "debugpy",
       "request": "launch",
