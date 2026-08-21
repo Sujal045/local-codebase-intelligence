@@ -24,9 +24,9 @@ One-shot RAG (``ask()``) always retrieves, then generates. An agent
 ``max_steps`` is the maximum number of LLM rounds. That is the main
 guard against infinite tool loops.
 
-This module does not talk to Ollama. Tests inject a scripted
-``ToolCallingLLM``. Slice 6B will implement the HTTP tool protocol.
-The CLI still uses one-shot ``ask()`` until Slice 6C.
+Tests can inject a scripted ``ToolCallingLLM``. Production uses
+``OllamaChatLLM.respond`` (Slice 6B). The CLI still uses one-shot
+``ask()`` until Slice 6C.
 """
 
 from __future__ import annotations

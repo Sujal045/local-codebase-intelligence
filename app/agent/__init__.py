@@ -1,10 +1,10 @@
-"""Tool-using agent loop (Slice 6A).
+"""Tool-using agent loop (Slices 6A / 6B).
 
-``run_agent`` is the only public entry: a scripted or real
-``ToolCallingLLM`` plus a list of ``Tool`` objects.
+``run_agent`` is the only public entry: a ``ToolCallingLLM`` plus tools.
 
-Ollama native tool calling is Slice 6B. CLI wiring is Slice 6C.
-``python -m app.cli ask`` remains one-shot RAG.
+Slice 6A: loop + scripted LLM.
+Slice 6B: ``OllamaChatLLM.respond`` speaks Ollama's native tools API.
+Slice 6C: CLI wiring. ``python -m app.cli ask`` remains one-shot RAG.
 """
 
 from __future__ import annotations

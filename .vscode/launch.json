@@ -430,6 +430,42 @@
       ]
     },
     {
+      "name": "Debug: pytest (ollama tools)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_ollama_tools.py",
+        "-v",
+        "-m",
+        "not integration"
+      ]
+    },
+    {
+      "name": "Debug: pytest (ollama tools, live)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "LIVE_OLLAMA": "1"
+      },
+      "args": [
+        "tests/test_ollama_tools.py::test_live_ollama_tool_call_smoke",
+        "-v",
+        "-s"
+      ]
+    },
+    {
       "name": "Debug: CLI index (mini_repo)",
       "type": "debugpy",
       "request": "launch",

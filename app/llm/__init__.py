@@ -1,7 +1,9 @@
-"""Local LLM client for Version 1 Code RAG (Slice 1d).
+"""Local LLM client for Code RAG and the agent (Slices 1d / 6B).
 
-Ollama serves chat models over HTTP. We send a prompt (system + user messages)
-and receive generated text. This is generation, not embedding.
+Ollama serves chat models over HTTP.
+
+- ``complete(system=, user=)`` — one-shot text for RAG ``ask()``
+- ``respond(messages, tools=)`` — agent turns that may include tool_calls
 """
 
 from __future__ import annotations

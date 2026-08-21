@@ -7,7 +7,8 @@ The loop does not store private chain-of-thought. Callers can see:
 - the final assistant text
 
 ``ToolCallingLLM`` is a separate protocol from ``ChatLLM`` (which only
-does system+user → text). Slice 6B will teach Ollama's native tool API.
+does system+user → text). ``OllamaChatLLM.respond`` (Slice 6B) implements
+this protocol against Ollama's native ``tools`` / ``tool_calls`` API.
 """
 
 from __future__ import annotations
