@@ -516,6 +516,22 @@
       ]
     },
     {
+      "name": "Debug: pytest (context)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_context.py",
+        "-v"
+      ]
+    },
+    {
       "name": "Debug: pytest (cli agent)",
       "type": "debugpy",
       "request": "launch",
