@@ -528,7 +528,10 @@
       },
       "args": [
         "tests/test_context.py",
-        "-v"
+        "tests/test_rag.py",
+        "-v",
+        "-m",
+        "not integration"
       ]
     },
     {

@@ -29,9 +29,9 @@ from typing import Any
 import httpx
 
 from app.agent.types import AgentTurn, ToolCall
+from app.config import DEFAULT_CHAT_MODEL
 
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
-DEFAULT_CHAT_MODEL = "qwen2.5-coder:3b"
 
 
 class OllamaChatLLM:

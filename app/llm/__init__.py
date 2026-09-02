@@ -10,11 +10,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from app.llm.ollama_chat import (
-    DEFAULT_CHAT_MODEL,
-    DEFAULT_OLLAMA_BASE_URL,
-    OllamaChatLLM,
-)
+from app.config import DEFAULT_CHAT_MODEL
+from app.llm.ollama_chat import DEFAULT_OLLAMA_BASE_URL, OllamaChatLLM
 
 __all__ = [
     "DEFAULT_CHAT_MODEL",

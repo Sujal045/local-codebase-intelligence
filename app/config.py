@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from app.embeddings.embedder import DEFAULT_EMBED_MODEL, DEFAULT_OLLAMA_BASE_URL
-from app.llm.ollama_chat import DEFAULT_CHAT_MODEL
 from app.reranking.reranker import DEFAULT_RERANK_MODEL
 from app.retrieval.vector_store import DEFAULT_COLLECTION_NAME, DEFAULT_QDRANT_URL
+
+# Local chat model (Ollama). Defined here — not imported from ``ollama_chat`` —
+# so ``app.config`` never depends on the agent/tools import graph.
+DEFAULT_CHAT_MODEL = "qwen2.5-coder:3b"
 
 # nomic-embed-text produces 768-dimensional vectors.
 NOMIC_EMBED_DIMENSIONS = 768

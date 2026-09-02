@@ -142,3 +142,61 @@ def test_dedupe_chunks_preserves_order() -> None:
 
 def test_dedupe_chunks_empty() -> None:
     assert dedupe_chunks([]) == []
+
+
+# --- ContextBuilder (Slice 7B) ---
+
+
+def test_order_lost_in_middle_places_best_at_edges() -> None:
+    from app.context.builder import order_lost_in_middle
+
+    chunks = [_scored(path=f"{i}.py", score=1.0 - i * 0.1) for i in range(5)]
+    ordered = order_lost_in_middle(chunks)
+    assert ordered[0].path == "0.py"
+    assert ordered[-1].path == "1.py"
+    assert [chunk.path for chunk in ordered] == ["0.py", "2.py", "4.py", "3.py", "1.py"]
+
+
+def test_context_builder_dedupes_before_budgeting() -> None:
+    from app.context import ContextBudget, ContextBuilder
+
+    duplicate = _scored(path="a.py", start=1, end=5, score=0.9)
+    copy = _scored(path="a.py", start=1, end=5, score=0.5, text="duplicate body")
+    other = _scored(path="b.py", start=1, end=5, score=0.8)
+    built = ContextBuilder().build(
+        [duplicate, copy, other],
+        ContextBudget(max_tokens=500, reserved_tokens=0),
+    )
+    assert built.deduped == 1
+    assert len(built.chunks) == 2
+    assert built.chunks[0].path == "a.py"
+
+
+def test_context_builder_truncates_oversized_chunk() -> None:
+    from app.context import ContextBudget, ContextBuilder, TRUNCATION_MARKER
+
+    huge = _scored(text="x\n" * 500, score=0.95)
+    built = ContextBuilder().build(
+        [huge],
+        ContextBudget(max_tokens=30, reserved_tokens=0),
+    )
+    assert built.truncated == 1
+    assert TRUNCATION_MARKER in built.text
+    assert built.tokens_used <= 30
+
+
+def test_context_builder_drops_chunks_when_budget_full() -> None:
+    from app.context import ContextBudget, ContextBuilder
+
+    chunks = [
+        _scored(path="a.py", text="a" * 200, score=0.95),
+        _scored(path="b.py", text="b" * 200, score=0.90),
+        _scored(path="c.py", text="c" * 200, score=0.85),
+    ]
+    built = ContextBuilder().build(
+        chunks,
+        ContextBudget(max_tokens=40, reserved_tokens=0),
+    )
+    assert len(built.chunks) < len(chunks)
+    assert built.dropped >= 1
+    assert built.tokens_used <= 40
