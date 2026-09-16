@@ -63,13 +63,15 @@ def run_agent(
     max_steps: int = DEFAULT_MAX_STEPS,
     system_prompt: str = DEFAULT_AGENT_SYSTEM_PROMPT,
     observation_budget: ContextBudget | None = None,
+    dedupe_observations: bool = True,
 ) -> AgentAnswer:
     """Run the tool loop until a final answer or ``max_steps`` LLM rounds.
 
     Args:
-        observation_budget: When set, dedupe chunk hits the model already
-            saw and compress each tool observation to fit the remaining
-            budget across rounds. Omit for full tool output (default).
+        observation_budget: When set, compress each tool observation to fit
+            the remaining budget across rounds. Omit for full tool text.
+        dedupe_observations: When True (default), drop chunk bodies the
+            model already saw in earlier tool results (Slice 7C / 7D).
     """
     if not question.strip():
         raise ValueError("question must be non-empty")
@@ -87,6 +89,7 @@ def run_agent(
     events: list[AgentEvent] = []
     llm_calls = 0
     context_state = AgentContextState()
+    report_stats = observation_budget is not None or dedupe_observations
 
     for _ in range(max_steps):
         turn = llm.respond(messages, tools=specs)
@@ -103,7 +106,7 @@ def run_agent(
                 llm_calls=llm_calls,
                 stopped_reason=STOPPED_FINAL,
                 context_state=context_state,
-                observation_budget=observation_budget,
+                report_stats=report_stats,
             )
 
         for call in turn.tool_calls:
@@ -119,6 +122,7 @@ def run_agent(
                 result,
                 state=context_state,
                 budget=observation_budget,
+                dedupe=dedupe_observations,
             )
             events.append(
                 AgentEvent(
@@ -140,7 +144,7 @@ def run_agent(
         llm_calls=llm_calls,
         stopped_reason=STOPPED_LIMIT,
         context_state=context_state,
-        observation_budget=observation_budget,
+        report_stats=report_stats,
     )
 
 
@@ -152,10 +156,10 @@ def _finish(
     llm_calls: int,
     stopped_reason: str,
     context_state: AgentContextState,
-    observation_budget: ContextBudget | None,
+    report_stats: bool,
 ) -> AgentAnswer:
     stats: AgentObservationStats | None = None
-    if observation_budget is not None:
+    if report_stats:
         stats = AgentObservationStats(
             tokens_used=context_state.observation_tokens,
             compressed=context_state.compressed,

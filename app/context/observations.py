@@ -53,10 +53,24 @@ def prepare_tool_observation(
     *,
     state: AgentContextState,
     budget: ContextBudget | None = None,
+    dedupe: bool = True,
 ) -> PreparedObservation:
-    """Dedupe chunk hits, apply session budget, return observation text."""
+    """Optionally dedupe chunk hits, apply session budget, return text.
+
+    Args:
+        result: Tool outcome (content + optional scored hits).
+        state: Mutable session counters and seen locations.
+        budget: When set, compress to remaining observation tokens.
+        dedupe: When True (default), drop chunk bodies already shown.
+    """
     deduped_before = state.chunks_deduped
-    content = _content_with_session_dedupe(result, state)
+    if dedupe:
+        content = _content_with_session_dedupe(result, state)
+    else:
+        content = result.content
+        if result.hits:
+            for hit in result.hits:
+                state.seen_locations.add(chunk_location_key(hit))
     compressed = False
     deduped_this_call = state.chunks_deduped - deduped_before
 

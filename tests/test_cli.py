@@ -26,9 +26,30 @@ def test_parser_index_and_ask_defaults() -> None:
     assert ask_args.candidate_limit == 20
     assert ask_args.rerank is True
     assert ask_args.rerank_model == "BAAI/bge-reranker-base"
+    assert ask_args.context_budget is True
+    assert ask_args.max_context_tokens == 4096
+    assert ask_args.reserved_tokens == 512
 
-    skipped = parser.parse_args(["ask", "q", "--no-rerank"])
+    skipped = parser.parse_args(["ask", "q", "--no-rerank", "--no-context-budget"])
     assert skipped.rerank is False
+    assert skipped.context_budget is False
+
+
+def test_parser_ask_context_budget_tokens() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "ask",
+            "q",
+            "--max-context-tokens",
+            "2000",
+            "--reserved-tokens",
+            "200",
+        ]
+    )
+    assert args.max_context_tokens == 2000
+    assert args.reserved_tokens == 200
+    assert args.context_budget is True
 
 
 def test_cmd_index_writes_to_store(capsys) -> None:
@@ -89,6 +110,9 @@ def test_cmd_ask_prints_answer_and_sources(capsys) -> None:
         limit=3,
         candidate_limit=20,
         rerank=True,
+        context_budget=True,
+        max_context_tokens=4096,
+        reserved_tokens=512,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )
@@ -115,6 +139,84 @@ def test_cmd_ask_prints_answer_and_sources(capsys) -> None:
     assert "(function)" in out
     assert "rerank=" in out
     assert "rrf=" not in out
+    assert "Context: tokens_used=" in out
+
+
+def test_cmd_ask_no_context_budget_omits_context_line(capsys) -> None:
+    embedder = FakeEmbedder()
+    llm = RecordingLLM()
+    args_index = Namespace(
+        repo=str(FIXTURE_REPO),
+        chunk_size=20,
+        overlap=0,
+        recreate=True,
+        qdrant_url=":memory:",
+    )
+    args_ask = Namespace(
+        question="How do we detect spam jobs?",
+        limit=3,
+        candidate_limit=20,
+        rerank=True,
+        context_budget=False,
+        max_context_tokens=4096,
+        reserved_tokens=512,
+        qdrant_url=":memory:",
+        ollama_url="http://127.0.0.1:11434",
+    )
+    with QdrantVectorStore(
+        collection_name="cli_ask_no_budget",
+        vector_size=embedder.dimensions,
+        url=":memory:",
+    ) as store:
+        assert cmd_index(args_index, embedder=embedder, store=store) == 0
+        code = cmd_ask(
+            args_ask,
+            embedder=embedder,
+            store=store,
+            llm=llm,
+            reranker=FakeReranker(),
+        )
+
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "Context: tokens_used=" not in out
+
+
+def test_cmd_ask_invalid_budget_returns_error(capsys) -> None:
+    embedder = FakeEmbedder()
+    args_index = Namespace(
+        repo=str(FIXTURE_REPO),
+        chunk_size=20,
+        overlap=0,
+        recreate=True,
+        qdrant_url=":memory:",
+    )
+    args_ask = Namespace(
+        question="q",
+        limit=3,
+        candidate_limit=20,
+        rerank=False,
+        context_budget=True,
+        max_context_tokens=10,
+        reserved_tokens=10,
+        qdrant_url=":memory:",
+        ollama_url="http://127.0.0.1:11434",
+    )
+    with QdrantVectorStore(
+        collection_name="cli_ask_bad_budget",
+        vector_size=embedder.dimensions,
+        url=":memory:",
+    ) as store:
+        assert cmd_index(args_index, embedder=embedder, store=store) == 0
+        code = cmd_ask(
+            args_ask,
+            embedder=embedder,
+            store=store,
+            llm=RecordingLLM(),
+        )
+
+    assert code == 1
+    assert "invalid context budget" in capsys.readouterr().err
 
 
 def test_cmd_ask_no_rerank_prints_rrf_scores(capsys) -> None:
@@ -132,6 +234,9 @@ def test_cmd_ask_no_rerank_prints_rrf_scores(capsys) -> None:
         limit=3,
         candidate_limit=20,
         rerank=False,
+        context_budget=True,
+        max_context_tokens=4096,
+        reserved_tokens=512,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )
@@ -163,6 +268,9 @@ def test_cmd_ask_without_collection_fails(capsys) -> None:
         limit=3,
         candidate_limit=20,
         rerank=True,
+        context_budget=True,
+        max_context_tokens=4096,
+        reserved_tokens=512,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )

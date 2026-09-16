@@ -3,7 +3,7 @@
 Slice 7A: token estimation, budgets, truncation, deduplication.
 Slice 7B: ``ContextBuilder`` for budget-aware one-shot RAG.
 Slice 7C: observation dedupe + compression in the agent loop.
-Slice 7D adds CLI flags.
+Slice 7D: CLI flags and context-budget visibility.
 """
 
 from __future__ import annotations

@@ -179,7 +179,8 @@ def test_run_agent_dedupes_duplicate_chunk_hits_across_tools() -> None:
     observations = [event.content for event in result.events if event.kind == "observation"]
     assert "compute_genuineness" in observations[0]
     assert "Already shown" in observations[1]
-    assert result.observation_stats is None
+    assert result.observation_stats is not None
+    assert result.observation_stats.chunks_deduped >= 1
 
 
 def test_run_agent_compresses_observations_with_budget() -> None:
@@ -208,4 +209,34 @@ def test_run_agent_compresses_observations_with_budget() -> None:
 
     second_messages = llm.calls[1]
     assert "[truncated]" in second_messages[-1]["content"]
+
+
+def test_run_agent_no_dedupe_keeps_duplicate_bodies() -> None:
+    hit = ScoredChunk(
+        path="src/scoring.py",
+        start_line=1,
+        end_line=8,
+        text="def compute_genuineness(job):\n    return score",
+        score=0.95,
+        symbol="compute_genuineness",
+        kind="function",
+    )
+    tool = ChunkHitsTool([hit])
+    llm = ScriptedLLM(
+        [
+            AgentTurn(tool_calls=(ToolCall(name="chunk_hits", arguments={}),)),
+            AgentTurn(tool_calls=(ToolCall(name="chunk_hits", arguments={}),)),
+            AgentTurn(content="Done."),
+        ]
+    )
+    result = run_agent(
+        "find spam",
+        llm=llm,
+        tools=[tool],
+        dedupe_observations=False,
+    )
+    observations = [event.content for event in result.events if event.kind == "observation"]
+    assert "Already shown" not in observations[1]
+    assert "compute_genuineness" in observations[1]
+    assert result.observation_stats is None
 
