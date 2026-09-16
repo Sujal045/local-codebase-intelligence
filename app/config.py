@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from app.embeddings.embedder import DEFAULT_EMBED_MODEL, DEFAULT_OLLAMA_BASE_URL
-from app.llm.ollama_chat import DEFAULT_CHAT_MODEL
 from app.reranking.reranker import DEFAULT_RERANK_MODEL
 from app.retrieval.vector_store import DEFAULT_COLLECTION_NAME, DEFAULT_QDRANT_URL
+
+# Local chat model (Ollama). Defined here — not imported from ``ollama_chat`` —
+# so ``app.config`` never depends on the agent/tools import graph.
+DEFAULT_CHAT_MODEL = "qwen2.5-coder:3b"
 
 # nomic-embed-text produces 768-dimensional vectors.
 NOMIC_EMBED_DIMENSIONS = 768
@@ -17,16 +20,23 @@ DEFAULT_TOP_K = 5
 DEFAULT_CANDIDATE_LIMIT = 20
 DEFAULT_VECTOR_SIZE = NOMIC_EMBED_DIMENSIONS
 
+# Context engineering (Version 7): token ceiling for RAG context / agent
+# observations. Reserved tokens leave room for system + question + answer.
+DEFAULT_MAX_CONTEXT_TOKENS = 4096
+DEFAULT_RESERVED_TOKENS = 512
+
 __all__ = [
     "DEFAULT_CANDIDATE_LIMIT",
     "DEFAULT_CHAT_MODEL",
     "DEFAULT_CHUNK_SIZE",
     "DEFAULT_COLLECTION_NAME",
     "DEFAULT_EMBED_MODEL",
+    "DEFAULT_MAX_CONTEXT_TOKENS",
     "DEFAULT_OLLAMA_BASE_URL",
     "DEFAULT_OVERLAP",
     "DEFAULT_QDRANT_URL",
     "DEFAULT_RERANK_MODEL",
+    "DEFAULT_RESERVED_TOKENS",
     "DEFAULT_TOP_K",
     "DEFAULT_VECTOR_SIZE",
     "NOMIC_EMBED_DIMENSIONS",

@@ -16,6 +16,7 @@ from app.agent.tools_bundle import build_agent_tools
 from app.agent.types import (
     AgentAnswer,
     AgentEvent,
+    AgentObservationStats,
     AgentTurn,
     ToolCall,
     ToolCallingLLM,
@@ -26,6 +27,7 @@ __all__ = [
     "DEFAULT_MAX_STEPS",
     "AgentAnswer",
     "AgentEvent",
+    "AgentObservationStats",
     "AgentTurn",
     "ToolCall",
     "ToolCallingLLM",

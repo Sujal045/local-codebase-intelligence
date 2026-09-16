@@ -1,10 +1,10 @@
-"""End-to-end ask path for Code RAG (Slice 4C).
+"""End-to-end ask path for Code RAG (Slice 4C; context budget in 7B).
 
 Flow:
 
     question
       → retrieve_chunks (hybrid pool, optional rerank)
-      → build prompt
+      → build prompt (optional context budget)
       → LLM complete
       → RagAnswer(answer, sources)
 
@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.config import DEFAULT_CANDIDATE_LIMIT
+from app.context import BuiltContext, ContextBudget, ContextBuilder
 from app.embeddings import Embedder
 from app.llm import ChatLLM
 from app.llm.prompt import build_rag_messages
@@ -34,6 +35,7 @@ class RagAnswer:
     answer: str
     sources: list[ScoredChunk]
     reranked: bool = False
+    context: BuiltContext | None = None
 
 
 def ask(
@@ -46,6 +48,7 @@ def ask(
     candidate_limit: int = DEFAULT_CANDIDATE_LIMIT,
     bm25: Bm25Index | None = None,
     reranker: Reranker | None = None,
+    context_budget: ContextBudget | None = None,
 ) -> RagAnswer:
     """Retrieve, optionally rerank, and generate an answer.
 
@@ -64,6 +67,10 @@ def ask(
         reranker: If given, scores the hybrid pool jointly with the query
             (Slice 4B). If omitted, the LLM sees Reciprocal Rank Fusion
             order (``--no-rerank``).
+        context_budget: When set, dedupe, reorder, truncate, and drop chunks
+            so formatted context fits ``budget.available``. ``sources`` then
+            lists only the chunks the LLM actually saw (bodies may be
+            truncated). Omit for unbounded formatting (default).
     """
     if not question.strip():
         raise ValueError("question must be non-empty")
@@ -77,11 +84,24 @@ def ask(
         bm25=bm25,
         reranker=reranker,
     )
-    system, user = build_rag_messages(question, retrieved.chunks)
+
+    built: BuiltContext | None = None
+    if context_budget is not None:
+        built = ContextBuilder().build(retrieved.chunks, context_budget)
+        prompt_chunks = list(built.chunks)
+        system, user = build_rag_messages(
+            question,
+            prompt_chunks,
+            context_text=built.text,
+        )
+    else:
+        prompt_chunks = retrieved.chunks
+        system, user = build_rag_messages(question, prompt_chunks)
     answer = llm.complete(system=system, user=user)
     return RagAnswer(
         question=question.strip(),
         answer=answer,
-        sources=retrieved.chunks,
+        sources=prompt_chunks,
         reranked=retrieved.reranked,
+        context=built,
     )

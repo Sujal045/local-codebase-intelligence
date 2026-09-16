@@ -1,4 +1,4 @@
-"""Command-line entry point for Code RAG and the tool agent (Slice 6C).
+"""Command-line entry point for Code RAG and the tool agent (Slice 7D).
 
 Commands:
 
@@ -9,12 +9,14 @@ Commands:
 ``index`` walks a repository, chunks files, embeds them, and stores points
 in Qdrant (also the BM25 corpus).
 
-``ask`` is one-shot hybrid RAG (optional rerank) — no tool loop.
+``ask`` is one-shot hybrid RAG (optional rerank) with optional context
+budgeting (Slice 7B / 7D).
 
 ``agent`` runs ``run_agent`` with the Version 5 tools. The model may call
 ``search_code``, ``read_file``, ``get_symbol``, ``find_references``, and
 ``search_documentation``. ``--repo`` is the sandbox root for ``read_file``
-and should be the same tree you indexed.
+and should be the same tree you indexed. Observation dedupe/compress are
+controlled by CLI flags (Slice 7C / 7D).
 """
 
 from __future__ import annotations
@@ -31,13 +33,16 @@ from app.config import (
     DEFAULT_CHUNK_SIZE,
     DEFAULT_COLLECTION_NAME,
     DEFAULT_EMBED_MODEL,
+    DEFAULT_MAX_CONTEXT_TOKENS,
     DEFAULT_OLLAMA_BASE_URL,
     DEFAULT_OVERLAP,
     DEFAULT_QDRANT_URL,
     DEFAULT_RERANK_MODEL,
+    DEFAULT_RESERVED_TOKENS,
     DEFAULT_TOP_K,
     DEFAULT_VECTOR_SIZE,
 )
+from app.context import ContextBudget
 from app.embeddings import Embedder, OllamaEmbedder
 from app.indexing.pipeline import IndexResult, index_repository
 from app.llm import ChatLLM, OllamaChatLLM
@@ -75,6 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_shared_args(ask_p)
     _add_chat_args(ask_p)
     _add_retrieval_args(ask_p)
+    _add_context_budget_args(ask_p)
 
     agent_p = sub.add_parser(
         "agent",
@@ -89,6 +95,22 @@ def build_parser() -> argparse.ArgumentParser:
     _add_shared_args(agent_p)
     _add_chat_args(agent_p)
     _add_retrieval_args(agent_p)
+    _add_context_budget_args(agent_p)
+    agent_p.add_argument(
+        "--dedupe",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Drop duplicate chunk bodies across tool observations (default: true)",
+    )
+    agent_p.add_argument(
+        "--compress",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Compress tool observations to the context budget "
+            "(default: true; requires --context-budget)"
+        ),
+    )
     agent_p.add_argument(
         "--max-steps",
         type=int,
@@ -149,6 +171,43 @@ def _add_retrieval_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_context_budget_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--context-budget",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fit retrieved / tool context into a token budget (default: true)",
+    )
+    parser.add_argument(
+        "--max-context-tokens",
+        type=int,
+        default=DEFAULT_MAX_CONTEXT_TOKENS,
+        help=(
+            f"Total token ceiling for context budgeting "
+            f"(default: {DEFAULT_MAX_CONTEXT_TOKENS})"
+        ),
+    )
+    parser.add_argument(
+        "--reserved-tokens",
+        type=int,
+        default=DEFAULT_RESERVED_TOKENS,
+        help=(
+            f"Tokens reserved for system/question/answer "
+            f"(default: {DEFAULT_RESERVED_TOKENS})"
+        ),
+    )
+
+
+def _context_budget_from_args(args: argparse.Namespace) -> ContextBudget | None:
+    """Build a ``ContextBudget`` when budgeting is enabled, else ``None``."""
+    if not getattr(args, "context_budget", True):
+        return None
+    return ContextBudget(
+        max_tokens=args.max_context_tokens,
+        reserved_tokens=args.reserved_tokens,
+    )
+
+
 def cmd_index(
     args: argparse.Namespace,
     *,
@@ -194,6 +253,11 @@ def cmd_ask(
                 file=sys.stderr,
             )
             return 1
+        try:
+            context_budget = _context_budget_from_args(args)
+        except ValueError as exc:
+            print(f"error: invalid context budget: {exc}", file=sys.stderr)
+            return 1
         result = rag_ask(
             args.question,
             embedder=embedder,
@@ -202,6 +266,7 @@ def cmd_ask(
             limit=args.limit,
             candidate_limit=args.candidate_limit,
             reranker=reranker if args.rerank else None,
+            context_budget=context_budget,
         )
     except Exception as exc:
         print(
@@ -239,6 +304,14 @@ def cmd_agent(
             print("error: --max-steps must be >= 1", file=sys.stderr)
             return 1
 
+        try:
+            budget = _context_budget_from_args(args)
+        except ValueError as exc:
+            print(f"error: invalid context budget: {exc}", file=sys.stderr)
+            return 1
+        observation_budget = budget if getattr(args, "compress", True) else None
+        dedupe_observations = getattr(args, "dedupe", True)
+
         tool_list: Sequence[Tool]
         if tools is not None:
             tool_list = tools
@@ -257,6 +330,8 @@ def cmd_agent(
             llm=llm,
             tools=tool_list,
             max_steps=args.max_steps,
+            observation_budget=observation_budget,
+            dedupe_observations=dedupe_observations,
         )
     except NotADirectoryError as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -354,9 +429,19 @@ def _print_ask_result(result: RagAnswer) -> None:
     print(f"Sources ({kind}):")
     if not result.sources:
         print("  (none retrieved)")
-        return
-    for i, chunk in enumerate(result.sources, start=1):
-        print(f"  [{i}] {chunk.label()} ({score_name}={chunk.score:.4f})")
+    else:
+        for i, chunk in enumerate(result.sources, start=1):
+            print(f"  [{i}] {chunk.label()} ({score_name}={chunk.score:.4f})")
+    if result.context is not None:
+        ctx = result.context
+        print()
+        print(
+            "Context: "
+            f"tokens_used={ctx.tokens_used} "
+            f"deduped={ctx.deduped} "
+            f"truncated={ctx.truncated} "
+            f"dropped={ctx.dropped}"
+        )
 
 
 def _print_agent_result(
@@ -372,6 +457,14 @@ def _print_agent_result(
         f"Agent: llm_calls={result.llm_calls} "
         f"stopped={result.stopped_reason}"
     )
+    if result.observation_stats is not None:
+        stats = result.observation_stats
+        print(
+            "Context: "
+            f"observation_tokens={stats.tokens_used} "
+            f"compressed={stats.compressed} "
+            f"chunks_deduped={stats.chunks_deduped}"
+        )
     if not trace:
         return
 

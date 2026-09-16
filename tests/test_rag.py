@@ -9,6 +9,7 @@ import pytest
 
 from app.indexing.chunker import Chunk
 from app.indexing.pipeline import index_chunks
+from app.context import ContextBudget
 from app.llm.ollama_chat import OllamaChatLLM
 from app.llm.prompt import build_rag_messages, format_context
 from app.retrieval.rag import RagAnswer, ask
@@ -73,6 +74,44 @@ def test_build_rag_messages_contains_question_and_context() -> None:
 def test_build_rag_messages_rejects_empty_question() -> None:
     with pytest.raises(ValueError, match="question"):
         build_rag_messages("   ", [_chunk()])
+
+
+def test_build_rag_messages_applies_context_budget() -> None:
+    huge = _chunk(text="line\n" * 400)
+    system, user = build_rag_messages(
+        "Where is spam detected?",
+        [huge],
+        context_budget=ContextBudget(max_tokens=40, reserved_tokens=0),
+    )
+    assert "ONLY the provided code" in system
+    assert "Where is spam detected?" in user
+    assert "[truncated]" in user
+
+
+def test_ask_with_context_budget_returns_built_stats() -> None:
+    class _BudgetLLM:
+        model_name = "fake-chat"
+
+        def complete(self, *, system: str, user: str) -> str:
+            assert "compute_genuineness" in user
+            return "ok"
+
+    huge = _chunk(text="def compute_genuineness():\n" + ("    pass\n" * 200))
+    store = _FakeStore()
+    store.search = lambda query_vector, limit=5: [huge]  # type: ignore[method-assign]
+
+    result = ask(
+        "How do we detect spam?",
+        embedder=_FakeEmbedder(),
+        store=store,  # type: ignore[arg-type]
+        llm=_BudgetLLM(),
+        context_budget=ContextBudget(max_tokens=60, reserved_tokens=10),
+    )
+
+    assert result.context is not None
+    assert result.context.tokens_used <= 50
+    assert len(result.sources) >= 1
+    assert result.answer == "ok"
 
 
 def test_ollama_chat_complete_parses_message() -> None:

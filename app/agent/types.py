@@ -43,6 +43,15 @@ class AgentEvent:
 
 
 @dataclass(frozen=True)
+class AgentObservationStats:
+    """Observation token accounting when ``run_agent`` uses a budget."""
+
+    tokens_used: int
+    compressed: int
+    chunks_deduped: int
+
+
+@dataclass(frozen=True)
 class AgentAnswer:
     """Result of ``run_agent``."""
 
@@ -51,6 +60,7 @@ class AgentAnswer:
     events: tuple[AgentEvent, ...]
     llm_calls: int
     stopped_reason: str
+    observation_stats: AgentObservationStats | None = None
 
 
 @runtime_checkable

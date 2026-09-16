@@ -32,12 +32,49 @@ def test_parser_agent_defaults() -> None:
     assert args.trace is True
     assert args.rerank is True
     assert args.limit == 5
+    assert args.context_budget is True
+    assert args.max_context_tokens == 4096
+    assert args.reserved_tokens == 512
+    assert args.dedupe is True
+    assert args.compress is True
 
     quiet = parser.parse_args(
-        ["agent", "q", "--repo", "r", "--no-trace", "--max-steps", "3"]
+        [
+            "agent",
+            "q",
+            "--repo",
+            "r",
+            "--no-trace",
+            "--max-steps",
+            "3",
+            "--no-context-budget",
+            "--no-dedupe",
+            "--no-compress",
+        ]
     )
     assert quiet.trace is False
     assert quiet.max_steps == 3
+    assert quiet.context_budget is False
+    assert quiet.dedupe is False
+    assert quiet.compress is False
+
+
+def test_parser_agent_context_token_flags() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "agent",
+            "q",
+            "--repo",
+            "r",
+            "--max-context-tokens",
+            "1500",
+            "--reserved-tokens",
+            "100",
+        ]
+    )
+    assert args.max_context_tokens == 1500
+    assert args.reserved_tokens == 100
 
 
 def test_build_agent_tools_returns_five_named_tools() -> None:
@@ -102,6 +139,11 @@ def test_cmd_agent_prints_answer_and_trace(capsys) -> None:
         rerank=True,
         max_steps=8,
         trace=True,
+        context_budget=True,
+        max_context_tokens=4096,
+        reserved_tokens=512,
+        dedupe=True,
+        compress=True,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )
@@ -134,6 +176,7 @@ def test_cmd_agent_prints_answer_and_trace(capsys) -> None:
     assert "compute_genuineness" in out
     assert "Agent: llm_calls=2" in out
     assert "stopped=final_answer" in out
+    assert "Context: observation_tokens=" in out
     assert "Trace:" in out
     assert "→ search_code(" in out
     assert "← search_code:" in out
@@ -150,6 +193,11 @@ def test_cmd_agent_without_collection_fails(capsys) -> None:
         rerank=False,
         max_steps=4,
         trace=False,
+        context_budget=True,
+        max_context_tokens=4096,
+        reserved_tokens=512,
+        dedupe=True,
+        compress=True,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )
@@ -186,6 +234,11 @@ def test_cmd_agent_bad_repo_fails(capsys) -> None:
         rerank=False,
         max_steps=4,
         trace=False,
+        context_budget=True,
+        max_context_tokens=4096,
+        reserved_tokens=512,
+        dedupe=True,
+        compress=True,
         qdrant_url=":memory:",
         ollama_url="http://127.0.0.1:11434",
     )

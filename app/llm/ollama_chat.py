@@ -10,6 +10,10 @@ Slice 6B adds ``respond(messages, tools=)`` for native tool calling:
     response →  content and/or message.tool_calls
     we map   →  AgentTurn(content, tool_calls)
 
+When a small model prints a tool request as JSON in ``content`` instead
+of filling ``tool_calls``, ``parse_agent_turn`` recovers it so the agent
+loop can still execute the tool.
+
 Under the hood (conceptually):
 1. The model tokenizes the prompt messages (and tool schemas).
 2. An autoregressive neural network predicts the next tokens.
@@ -29,9 +33,9 @@ from typing import Any
 import httpx
 
 from app.agent.types import AgentTurn, ToolCall
+from app.config import DEFAULT_CHAT_MODEL
 
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
-DEFAULT_CHAT_MODEL = "qwen2.5-coder:3b"
 
 
 class OllamaChatLLM:
@@ -190,7 +194,13 @@ def messages_for_ollama(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def parse_agent_turn(data: dict[str, Any]) -> AgentTurn:
-    """Parse an Ollama /api/chat body into an ``AgentTurn``."""
+    """Parse an Ollama /api/chat body into an ``AgentTurn``.
+
+    Small local models sometimes *print* a tool call as JSON in
+    ``message.content`` instead of filling ``message.tool_calls``. When
+    native ``tool_calls`` are missing, we recover from that text so the
+    agent loop can still execute the tool.
+    """
     message = data.get("message")
     if not isinstance(message, dict):
         raise RuntimeError("Ollama response missing 'message' object")
@@ -199,11 +209,112 @@ def parse_agent_turn(data: dict[str, Any]) -> AgentTurn:
     content = raw_content if isinstance(raw_content, str) else ""
     tool_calls = parse_tool_calls(message.get("tool_calls"))
 
+    if not tool_calls:
+        recovered = tool_calls_from_content(content)
+        if recovered:
+            return AgentTurn(content="", tool_calls=recovered)
+
     if not content.strip() and not tool_calls:
         raise RuntimeError(
             "Ollama returned neither assistant content nor tool_calls"
         )
     return AgentTurn(content=content, tool_calls=tool_calls)
+
+
+def tool_calls_from_content(content: str) -> tuple[ToolCall, ...]:
+    """Recover tool calls from assistant text that looks like a tool request.
+
+    Handles shapes small models commonly emit as plain text::
+
+        {"name": "search_code", "arguments": {"query": "spam"}}
+        {"name": "echo", "parameters": {"text": "hi"}}
+        {"tool_calls": [{"function": {"name": "echo", "arguments": {...}}}]}
+
+    Also strips optional markdown `` ```json `` fences. Returns ``()`` when
+    the text is not a recognizable tool-call payload (normal final answers).
+    """
+    stripped = _strip_markdown_fence(content).strip()
+    if not stripped:
+        return ()
+
+    payload = _loads_json_object(stripped)
+    if payload is None:
+        return ()
+
+    if "tool_calls" in payload:
+        try:
+            return parse_tool_calls(payload["tool_calls"])
+        except RuntimeError:
+            return ()
+
+    call = _tool_call_from_mapping(payload)
+    if call is None:
+        return ()
+    return (call,)
+
+
+def _strip_markdown_fence(text: str) -> str:
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if not lines:
+        return stripped
+    # Drop opening ``` or ```json and closing ```
+    body = lines[1:]
+    if body and body[-1].strip() == "```":
+        body = body[:-1]
+    return "\n".join(body).strip()
+
+
+def _loads_json_object(text: str) -> dict[str, Any] | None:
+    """Parse ``text`` (or an embedded `{...}`) as a JSON object."""
+    candidates = [text]
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end > start:
+        candidates.append(text[start : end + 1])
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+        if isinstance(parsed, list) and len(parsed) == 1 and isinstance(parsed[0], dict):
+            return parsed[0]
+    return None
+
+
+def _tool_call_from_mapping(payload: dict[str, Any]) -> ToolCall | None:
+    """Build one ``ToolCall`` from a flat ``{name, arguments|parameters}`` object."""
+    name = payload.get("name")
+    if not isinstance(name, str) or not name.strip():
+        function = payload.get("function")
+        if isinstance(function, dict):
+            name = function.get("name")
+            if isinstance(name, str) and name.strip():
+                try:
+                    arguments = normalize_tool_arguments(
+                        function.get("arguments", function.get("parameters", {}))
+                    )
+                except RuntimeError:
+                    return None
+                return ToolCall(name=name.strip(), arguments=arguments)
+        return None
+
+    raw_args = payload.get("arguments", payload.get("parameters"))
+    if raw_args is None and set(payload.keys()) - {"name"}:
+        # Reject free-form JSON that is not shaped like a tool call.
+        return None
+    if raw_args is None:
+        raw_args = {}
+    try:
+        arguments = normalize_tool_arguments(raw_args)
+    except RuntimeError:
+        return None
+    return ToolCall(name=name.strip(), arguments=arguments)
 
 
 def parse_tool_calls(raw: Any) -> tuple[ToolCall, ...]:

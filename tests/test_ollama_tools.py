@@ -117,6 +117,98 @@ def test_parse_agent_turn_rejects_empty_response() -> None:
         parse_agent_turn({"message": {"role": "assistant", "content": "  "}})
 
 
+def test_tool_calls_from_content_recovers_flat_json() -> None:
+    from app.llm.ollama_chat import tool_calls_from_content
+
+    calls = tool_calls_from_content(
+        '{"name": "search_documentation", "arguments": {"query": "how to detect spam"}}'
+    )
+    assert calls == (
+        ToolCall(
+            name="search_documentation",
+            arguments={"query": "how to detect spam"},
+        ),
+    )
+
+
+def test_tool_calls_from_content_accepts_parameters_and_fence() -> None:
+    from app.llm.ollama_chat import tool_calls_from_content
+
+    calls = tool_calls_from_content(
+        "```json\n"
+        '{"name": "echo", "parameters": {"text": "ping"}}\n'
+        "```"
+    )
+    assert calls == (ToolCall(name="echo", arguments={"text": "ping"}),)
+
+
+def test_tool_calls_from_content_ignores_normal_answers() -> None:
+    from app.llm.ollama_chat import tool_calls_from_content
+
+    assert tool_calls_from_content("Spam is scored in compute_genuineness.") == ()
+    assert tool_calls_from_content('{"score": 0.8, "is_spam": true}') == ()
+
+
+def test_parse_agent_turn_recovers_json_content_as_tool_calls() -> None:
+    turn = parse_agent_turn(
+        {
+            "message": {
+                "role": "assistant",
+                "content": (
+                    '{"name": "search_documentation", '
+                    '"arguments": {"query": "how to detect spam"}}'
+                ),
+            }
+        }
+    )
+    assert turn.content == ""
+    assert turn.tool_calls == (
+        ToolCall(
+            name="search_documentation",
+            arguments={"query": "how to detect spam"},
+        ),
+    )
+
+
+def test_run_agent_executes_tool_when_model_prints_json_call() -> None:
+    """Small models may emit tool JSON in content; the loop must still run it."""
+    round_num = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        round_num["n"] += 1
+        if round_num["n"] == 1:
+            return httpx.Response(
+                200,
+                json={
+                    "message": {
+                        "role": "assistant",
+                        "content": (
+                            '{"name": "echo", "arguments": {"text": "spam"}}'
+                        ),
+                    }
+                },
+            )
+        return httpx.Response(
+            200,
+            json={"message": {"role": "assistant", "content": "Heard spam."}},
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
+    llm = OllamaChatLLM(client=client)
+    result = run_agent("Where is spam?", llm=llm, tools=[EchoTool()])
+    llm.close()
+
+    assert result.answer == "Heard spam."
+    assert result.llm_calls == 2
+    assert [event.kind for event in result.events] == [
+        "tool_call",
+        "observation",
+        "final",
+    ]
+    assert result.events[0].name == "echo"
+    assert result.events[1].content == "echo:spam"
+
+
 def test_ollama_respond_sends_tools_and_parses_tool_calls() -> None:
     captured: dict[str, object] = {}
 

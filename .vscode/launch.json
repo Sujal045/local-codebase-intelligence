@@ -499,6 +499,23 @@
       ]
     },
     {
+      "name": "Debug: CLI ask (--no-context-budget)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.cli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "ask",
+        "How do we detect spam jobs?",
+        "--no-context-budget"
+      ]
+    },
+    {
       "name": "Debug: CLI ask (--no-rerank)",
       "type": "debugpy",
       "request": "launch",
@@ -513,6 +530,28 @@
         "ask",
         "How do we detect spam jobs?",
         "--no-rerank"
+      ]
+    },
+    {
+      "name": "Debug: pytest (context)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "tests/test_context.py",
+        "tests/test_rag.py",
+        "tests/test_agent_loop.py",
+        "tests/test_cli.py",
+        "tests/test_cli_agent.py",
+        "-v",
+        "-m",
+        "not integration"
       ]
     },
     {
@@ -547,6 +586,28 @@
         "How do we detect spam jobs?",
         "--repo",
         "tests/fixtures/mini_repo"
+      ]
+    },
+    {
+      "name": "Debug: CLI agent (tight context budget)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.cli",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "args": [
+        "agent",
+        "How do we detect spam jobs?",
+        "--repo",
+        "tests/fixtures/mini_repo",
+        "--max-context-tokens",
+        "800",
+        "--reserved-tokens",
+        "200"
       ]
     },
     {
