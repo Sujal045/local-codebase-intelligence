@@ -7,8 +7,8 @@
 3. **Fit budget** — include chunks until tokens run out; truncate bodies
    when a chunk is too large for the remaining space.
 
-Slice 7B wires this into ``build_rag_messages`` and ``ask()``. The agent
-path still uses plain ``format_context`` until Slice 7C.
+Slice 7B wires this into ``build_rag_messages`` and ``ask()``.
+Slice 7C compresses agent tool observations in ``run_agent()``.
 """
 
 from __future__ import annotations

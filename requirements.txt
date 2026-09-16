@@ -22,6 +22,7 @@
 # Slice 6c: CLI agent command wiring run_agent + Version 5 tools
 # Slice 7a: token budgeting primitives (estimate, budget, truncate, dedupe)
 # Slice 7b: ContextBuilder + wire budget-aware context into ask()
+# Slice 7c: agent observation dedupe + compress in run_agent()
 pytest>=8.0.0
 httpx>=0.27.0
 qdrant-client>=1.12.0

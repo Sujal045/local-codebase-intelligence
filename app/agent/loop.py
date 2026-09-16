@@ -17,6 +17,9 @@ One-shot RAG (``ask()``) always retrieves, then generates. An agent
     execute tool.run(**args)
            │
            ▼
+    dedupe + compress observation (Slice 7C)
+           │
+           ▼
     observation appended to messages
            │
            └──────────► LLM  (until no tool, or max_steps)
@@ -35,7 +38,16 @@ from collections.abc import Sequence
 from typing import Any
 
 from app.agent.prompt import DEFAULT_AGENT_SYSTEM_PROMPT
-from app.agent.types import AgentAnswer, AgentEvent, AgentTurn, ToolCall, ToolCallingLLM
+from app.agent.types import (
+    AgentAnswer,
+    AgentEvent,
+    AgentObservationStats,
+    AgentTurn,
+    ToolCall,
+    ToolCallingLLM,
+)
+from app.context.budget import ContextBudget
+from app.context.observations import AgentContextState, prepare_tool_observation
 from app.tools.base import Tool, ToolResult
 
 DEFAULT_MAX_STEPS = 8
@@ -50,8 +62,15 @@ def run_agent(
     tools: Sequence[Tool],
     max_steps: int = DEFAULT_MAX_STEPS,
     system_prompt: str = DEFAULT_AGENT_SYSTEM_PROMPT,
+    observation_budget: ContextBudget | None = None,
 ) -> AgentAnswer:
-    """Run the tool loop until a final answer or ``max_steps`` LLM rounds."""
+    """Run the tool loop until a final answer or ``max_steps`` LLM rounds.
+
+    Args:
+        observation_budget: When set, dedupe chunk hits the model already
+            saw and compress each tool observation to fit the remaining
+            budget across rounds. Omit for full tool output (default).
+    """
     if not question.strip():
         raise ValueError("question must be non-empty")
     if max_steps < 1:
@@ -67,6 +86,7 @@ def run_agent(
     ]
     events: list[AgentEvent] = []
     llm_calls = 0
+    context_state = AgentContextState()
 
     for _ in range(max_steps):
         turn = llm.respond(messages, tools=specs)
@@ -76,12 +96,14 @@ def run_agent(
         if not turn.tool_calls:
             answer = turn.content.strip() or "(empty assistant message)"
             events.append(AgentEvent(kind="final", content=answer))
-            return AgentAnswer(
+            return _finish(
                 question=question.strip(),
                 answer=answer,
-                events=tuple(events),
+                events=events,
                 llm_calls=llm_calls,
                 stopped_reason=STOPPED_FINAL,
+                context_state=context_state,
+                observation_budget=observation_budget,
             )
 
         for call in turn.tool_calls:
@@ -93,23 +115,59 @@ def run_agent(
                 )
             )
             result = _execute_tool(catalog, call)
+            prepared = prepare_tool_observation(
+                result,
+                state=context_state,
+                budget=observation_budget,
+            )
             events.append(
                 AgentEvent(
                     kind="observation",
                     name=result.name,
-                    content=result.content,
+                    content=prepared.content,
                 )
             )
-            messages.append(_tool_message(result))
+            messages.append(
+                _tool_message(
+                    ToolResult(name=result.name, content=prepared.content)
+                )
+            )
 
-    return AgentAnswer(
+    return _finish(
         question=question.strip(),
-        answer=(
-            f"Stopped after {max_steps} LLM rounds without a final answer."
-        ),
-        events=tuple(events),
+        answer=f"Stopped after {max_steps} LLM rounds without a final answer.",
+        events=events,
         llm_calls=llm_calls,
         stopped_reason=STOPPED_LIMIT,
+        context_state=context_state,
+        observation_budget=observation_budget,
+    )
+
+
+def _finish(
+    *,
+    question: str,
+    answer: str,
+    events: tuple[AgentEvent, ...] | list[AgentEvent],
+    llm_calls: int,
+    stopped_reason: str,
+    context_state: AgentContextState,
+    observation_budget: ContextBudget | None,
+) -> AgentAnswer:
+    stats: AgentObservationStats | None = None
+    if observation_budget is not None:
+        stats = AgentObservationStats(
+            tokens_used=context_state.observation_tokens,
+            compressed=context_state.compressed,
+            chunks_deduped=context_state.chunks_deduped,
+        )
+    return AgentAnswer(
+        question=question,
+        answer=answer,
+        events=tuple(events),
+        llm_calls=llm_calls,
+        stopped_reason=stopped_reason,
+        observation_stats=stats,
     )
 
 

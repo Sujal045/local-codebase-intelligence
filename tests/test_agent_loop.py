@@ -1,4 +1,4 @@
-"""Tests for the agent loop (Slice 6A)."""
+"""Tests for the agent loop (Slice 6A; observation budget in 7C)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ from app.agent import (
     ToolCall,
     run_agent,
 )
+from app.context import ContextBudget
+from app.retrieval.vector_store import ScoredChunk
 from app.tools.base import ToolResult
 
 
@@ -125,3 +127,85 @@ def test_run_agent_rejects_empty_question_and_dup_tools() -> None:
         run_agent("q", llm=llm, tools=[EchoTool(), EchoTool()])
     with pytest.raises(ValueError, match="max_steps"):
         run_agent("q", llm=llm, tools=[], max_steps=0)
+
+
+class ChunkHitsTool:
+    """Returns fixed ScoredChunk hits for session dedupe tests."""
+
+    name = "chunk_hits"
+
+    def __init__(self, hits: list[ScoredChunk]) -> None:
+        self._hits = hits
+
+    def spec(self) -> dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "parameters": {"type": "object", "properties": {}},
+            },
+        }
+
+    def run(self, **arguments: Any) -> ToolResult:
+        from app.llm.prompt import format_context
+
+        return ToolResult(
+            name=self.name,
+            content=format_context(self._hits),
+            hits=tuple(self._hits),
+        )
+
+
+def test_run_agent_dedupes_duplicate_chunk_hits_across_tools() -> None:
+    hit = ScoredChunk(
+        path="src/scoring.py",
+        start_line=1,
+        end_line=8,
+        text="def compute_genuineness(job):\n    return score",
+        score=0.95,
+        symbol="compute_genuineness",
+        kind="function",
+    )
+    tool = ChunkHitsTool([hit])
+    llm = ScriptedLLM(
+        [
+            AgentTurn(tool_calls=(ToolCall(name="chunk_hits", arguments={}),)),
+            AgentTurn(tool_calls=(ToolCall(name="chunk_hits", arguments={}),)),
+            AgentTurn(content="Done."),
+        ]
+    )
+    result = run_agent("find spam", llm=llm, tools=[tool])
+
+    observations = [event.content for event in result.events if event.kind == "observation"]
+    assert "compute_genuineness" in observations[0]
+    assert "Already shown" in observations[1]
+    assert result.observation_stats is None
+
+
+def test_run_agent_compresses_observations_with_budget() -> None:
+    huge = "x\n" * 400
+    llm = ScriptedLLM(
+        [
+            AgentTurn(tool_calls=(ToolCall(name="echo", arguments={"text": huge}),)),
+            AgentTurn(content="Done."),
+        ]
+    )
+    budget = ContextBudget(max_tokens=30, reserved_tokens=0)
+    result = run_agent(
+        "big",
+        llm=llm,
+        tools=[EchoTool()],
+        observation_budget=budget,
+    )
+
+    observation = next(
+        event.content for event in result.events if event.kind == "observation"
+    )
+    assert result.observation_stats is not None
+    assert result.observation_stats.tokens_used <= 30
+    assert result.observation_stats.compressed >= 1
+    assert "[truncated]" in observation
+
+    second_messages = llm.calls[1]
+    assert "[truncated]" in second_messages[-1]["content"]
+

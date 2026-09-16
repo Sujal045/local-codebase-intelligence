@@ -200,3 +200,52 @@ def test_context_builder_drops_chunks_when_budget_full() -> None:
     assert len(built.chunks) < len(chunks)
     assert built.dropped >= 1
     assert built.tokens_used <= 40
+
+
+# --- compress + observations (Slice 7C) ---
+
+
+def test_compress_observation_unchanged_when_fits() -> None:
+    from app.context import compress_observation
+
+    text = "short observation"
+    assert compress_observation(text, 100) == text
+
+
+def test_compress_observation_truncates_long_text() -> None:
+    from app.context import TRUNCATION_MARKER, compress_observation
+
+    text = "line\n" * 300
+    result = compress_observation(text, 20)
+    assert TRUNCATION_MARKER in result
+
+
+def test_compress_observation_zero_budget_omits() -> None:
+    from app.context import OBSERVATION_OMITTED, compress_observation
+
+    assert compress_observation("hello", 0) == OBSERVATION_OMITTED
+
+
+def test_prepare_tool_observation_dedupes_seen_hits() -> None:
+    from app.context import AgentContextState, prepare_tool_observation
+    from app.tools.base import ToolResult
+
+    hit = _scored(path="src/a.py", start=1, end=10)
+    state = AgentContextState()
+    first = ToolResult(
+        name="search_code",
+        content=f"[1] {hit.label()}\n{hit.text}",
+        hits=(hit,),
+    )
+    prepared_first = prepare_tool_observation(first, state=state)
+    assert hit.text in prepared_first.content
+
+    second = ToolResult(
+        name="get_symbol",
+        content=f"Found 1 definition(s):\n\n[1] {hit.label()}\n{hit.text}",
+        hits=(hit,),
+    )
+    prepared_second = prepare_tool_observation(second, state=state)
+    assert prepared_second.chunks_deduped == 1
+    assert "Already shown" in prepared_second.content
+    assert "No new code chunks" in prepared_second.content

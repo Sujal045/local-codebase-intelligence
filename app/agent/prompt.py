@@ -1,6 +1,7 @@
 """System prompt for the tool-using agent (Slice 6A).
 
-Keep this short. Version 7 will budget tokens and compress observations.
+Keep this short. Slice 7C budgets and compresses tool observations in
+``run_agent``. Slice 7D adds CLI flags.
 Do not ask the model to dump hidden chain-of-thought; we only record
 tool names, arguments, observations, and the final answer.
 """
